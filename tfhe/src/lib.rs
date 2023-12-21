@@ -92,6 +92,14 @@ pub mod integer;
 /// cbindgen:ignore
 pub mod shortint;
 
+
+#[cfg(feature = "gadget")]
+/// Welcome to the TFHE-rs [`shortint`](`crate::shortint`) module documentation!
+///
+/// # Special module attributes
+/// cbindgen:ignore
+pub mod gadget;
+
 #[cfg(feature = "__wasm_api")]
 /// cbindgen:ignore
 mod js_on_wasm_api;

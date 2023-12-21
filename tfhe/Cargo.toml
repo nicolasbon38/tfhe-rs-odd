@@ -81,6 +81,7 @@ bytemuck = "1.13.1"
 # paste is used by the HL API
 boolean = ["dep:paste"]
 shortint = ["dep:paste"]
+gadget = ["dep:paste"]
 integer = ["shortint", "dep:paste"]
 internal-keycache = ["dep:lazy_static", "dep:fs2", "dep:bincode", "dep:paste"]
 safe-deserialization = ["dep:bincode"]
