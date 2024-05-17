@@ -76,7 +76,6 @@ impl BooleanParameters {
         }
     }
 }
-
 /// Default parameter set.
 ///
 /// This parameter set ensures 128-bits of security, and a probability of error is upper-bounded by
@@ -84,35 +83,35 @@ impl BooleanParameters {
 /// This parameter set allows to evaluate faster Boolean circuits than the `TFHE_LIB_PARAMETERS`
 /// one.
 pub const DEFAULT_PARAMETERS: BooleanParameters = BooleanParameters {
-    lwe_dimension: LweDimension(777),
+    lwe_dimension: LweDimension(722),
+    glwe_dimension: GlweDimension(2),
+    polynomial_size: PolynomialSize(512),
+    lwe_modular_std_dev: StandardDev(0.000013071021089943935),
+    glwe_modular_std_dev: StandardDev(0.00000004990272175010415),
+    pbs_base_log: DecompositionBaseLog(6),
+    pbs_level: DecompositionLevelCount(3),
+    ks_base_log: DecompositionBaseLog(3),
+    ks_level: DecompositionLevelCount(4),
+    encryption_key_choice: EncryptionKeyChoice::Small,
+};
+
+
+
+// Parameters with AP framework : error probability = 2^-40:
+pub const SIMON_PARAMETERS_40: BooleanParameters = BooleanParameters {
+    lwe_dimension: LweDimension(684),
     glwe_dimension: GlweDimension(3),
     polynomial_size: PolynomialSize(512),
-    lwe_modular_std_dev: StandardDev(0.000003725679281679651),
-    glwe_modular_std_dev: StandardDev(0.0000000000034525330484572114),
-    pbs_base_log: DecompositionBaseLog(18),
-    pbs_level: DecompositionLevelCount(1),
-    ks_base_log: DecompositionBaseLog(4),
-    ks_level: DecompositionLevelCount(3),
-    encryption_key_choice: EncryptionKeyChoice::Small,
-
-};
-
-
-
-
-pub const SIMON_PARAMETERS: BooleanParameters = BooleanParameters {
-    lwe_dimension: LweDimension(774),
-    glwe_dimension: GlweDimension(1),
-    polynomial_size: PolynomialSize(2048),
-    lwe_modular_std_dev: StandardDev(0.0000021515145918907506),
-    glwe_modular_std_dev: StandardDev(0.0000000000000000002168404344971009),
-    pbs_base_log: DecompositionBaseLog(23),
-    pbs_level: DecompositionLevelCount(1),
+    lwe_modular_std_dev: StandardDev(1.52587890625e-05),
+    glwe_modular_std_dev: StandardDev(9.313225746154785e-10),
+    pbs_base_log: DecompositionBaseLog(10),
+    pbs_level: DecompositionLevelCount(2),
     ks_base_log: DecompositionBaseLog(3),
-    ks_level: DecompositionLevelCount(5),
-    encryption_key_choice: EncryptionKeyChoice::Small,
+    ks_level: DecompositionLevelCount(4),
+    encryption_key_choice: EncryptionKeyChoice::Big,
 
 };
+
 
 
 //papier Zama Trivium
@@ -130,45 +129,66 @@ pub const ZAMA_TRIVIUM_PARAMETERS: BooleanParameters = BooleanParameters {
 
 };
 
-/////fait maison
-pub const ASCON_PARAMETERS: BooleanParameters = BooleanParameters {
-    lwe_dimension: LweDimension(768),
-    glwe_dimension: GlweDimension(1),
-    polynomial_size: PolynomialSize(2048),
-    lwe_modular_std_dev: StandardDev(0.000003725679281679651),
-    glwe_modular_std_dev: StandardDev(0.0000000000034525330484572114),
-    pbs_base_log: DecompositionBaseLog(15),
-    pbs_level: DecompositionLevelCount(2),
+
+
+////Paramètres proba erreur 2^-40
+pub const ASCON_PARAMETERS_40: BooleanParameters = BooleanParameters {
+    lwe_dimension: LweDimension(740),
+    glwe_dimension: GlweDimension(2),
+    polynomial_size: PolynomialSize(1024),
+    lwe_modular_std_dev: StandardDev(1.9073486328125e-06),
+    glwe_modular_std_dev: StandardDev(9.313225746154785e-10),
+    pbs_base_log: DecompositionBaseLog(7),
+    pbs_level: DecompositionLevelCount(3),
     ks_base_log: DecompositionBaseLog(5),
     ks_level: DecompositionLevelCount(3),
-    encryption_key_choice: EncryptionKeyChoice::Small,
-
+    encryption_key_choice: EncryptionKeyChoice::Big,
 };
 
-
-/////fait maison
-pub const SHA3_PARAMETERS: BooleanParameters = BooleanParameters {
-    lwe_dimension: LweDimension(668),
-    glwe_dimension: GlweDimension(6),
+//parameters for 40 bits of security
+pub const SHA3_PARAMETERS_40: BooleanParameters = BooleanParameters {
+    lwe_dimension: LweDimension(676),
+    glwe_dimension: GlweDimension(5),
     polynomial_size: PolynomialSize(256),
-    lwe_modular_std_dev: StandardDev(0.000003725679281679651),
-    glwe_modular_std_dev: StandardDev(0.0000000000034525330484572114),
-    pbs_base_log: DecompositionBaseLog(18),
+    lwe_modular_std_dev: StandardDev(0.0009765625),
+    glwe_modular_std_dev: StandardDev(0.0000000000000000008673617379884035),
+    pbs_base_log: DecompositionBaseLog(14),
     pbs_level: DecompositionLevelCount(1),
     ks_base_log: DecompositionBaseLog(4),
     ks_level: DecompositionLevelCount(3),
-    encryption_key_choice: EncryptionKeyChoice::Small,
+    encryption_key_choice: EncryptionKeyChoice::Big,
 
 };
 
 
-// vrais paramètres
 
-pub const AES_PARAMETERS: BooleanParameters = BooleanParameters {
-    lwe_dimension: LweDimension(660),
+
+
+
+pub const AES_PARAMETERS_40: BooleanParameters = BooleanParameters {
+    lwe_dimension: LweDimension(708),
     glwe_dimension: GlweDimension(3),
     polynomial_size: PolynomialSize(512),
-    lwe_modular_std_dev: StandardDev(0.0000000016808010045642132),
+    lwe_modular_std_dev: StandardDev(3.0517578125e-05),
+    glwe_modular_std_dev: StandardDev(9.313225746154785e-10),
+    pbs_base_log: DecompositionBaseLog(6),
+    pbs_level: DecompositionLevelCount(4),
+    ks_level: DecompositionLevelCount(7),
+    ks_base_log: DecompositionBaseLog(2),
+    encryption_key_choice: EncryptionKeyChoice::Big,
+};
+
+
+
+
+
+
+
+pub const AES_PARAMETERS_23: BooleanParameters = BooleanParameters {
+    lwe_dimension: LweDimension(672),
+    glwe_dimension: GlweDimension(3),
+    polynomial_size: PolynomialSize(512),
+    lwe_modular_std_dev: StandardDev(0.0000000010797982869590127),
     glwe_modular_std_dev: StandardDev(0.0000000000000000008673617379884035),
     pbs_base_log: DecompositionBaseLog(7),
     pbs_level: DecompositionLevelCount(3),
@@ -176,9 +196,6 @@ pub const AES_PARAMETERS: BooleanParameters = BooleanParameters {
     ks_base_log: DecompositionBaseLog(3),
     encryption_key_choice: EncryptionKeyChoice::Big,
 };
-
-
-
 
 
 

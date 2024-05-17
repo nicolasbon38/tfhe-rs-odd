@@ -362,6 +362,38 @@ impl<'a> FourierLweBootstrapKeyView<'a> {
             MonomialDegree(0),
         );
     }
+
+
+    pub fn bootstrap_without_sample_extract<Scalar>(
+        self,
+        mut glwe_out : GlweCiphertextMutView<'_, Scalar>,
+        lwe_in: LweCiphertextView<'_, Scalar>,
+        accumulator: GlweCiphertextView<'_, Scalar>,
+        fft: FftView<'_>,
+        stack: PodStack<'_>,
+    ) where
+        // CastInto required for PBS modulus switch which returns a usize
+        Scalar: UnsignedTorus + CastInto<usize>,
+    {
+        debug_assert_eq!(
+            lwe_in.ciphertext_modulus(),
+            accumulator.ciphertext_modulus()
+        );
+
+        let (mut local_accumulator_data, stack) =
+            stack.collect_aligned(CACHELINE_ALIGN, accumulator.as_ref().iter().copied());
+        let mut local_accumulator = GlweCiphertextMutView::from_container(
+            &mut *local_accumulator_data,
+            accumulator.polynomial_size(),
+            accumulator.ciphertext_modulus(),
+        );
+        self.blind_rotate_assign(local_accumulator.as_mut_view(), lwe_in.as_ref(), fft, stack);
+        
+        glwe_out.get_mut_mask().as_mut().copy_from_slice(local_accumulator.get_mask().as_ref());
+        glwe_out.get_mut_body().as_mut().copy_from_slice(local_accumulator.get_body().as_ref());
+
+
+    }          
 }
 
 impl<Scalar> FourierBootstrapKey<Scalar> for FourierLweBootstrapKeyOwned

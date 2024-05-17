@@ -3,11 +3,10 @@
 //! This module implements the generation of the client' secret keys, together with the
 //! encryption and decryption methods.
 
-use crate::gadget::ciphertext::Ciphertext;
+use crate::gadget::prelude::*;
 use crate::gadget::engine::{BooleanEngine, WithThreadLocalEngine};
 use crate::gadget::parameters::BooleanParameters;
 use crate::core_crypto::entities::*;
-use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 
 use super::ciphertext::Encoding;
@@ -67,9 +66,16 @@ impl ClientKey {
     /// assert_eq!(true, dec);
     /// # }
     /// ```
-    pub fn encrypt(&self, message: bool, encoding : &Encoding) -> Ciphertext {
+    // pub fn encrypt_boolean(&self, message: bool, encoding : &BooleanEncoding) -> Ciphertext {
+    //     assert!(encoding.is_canonical());
+    //     BooleanEngine::with_thread_local_mut(|engine| engine.encrypt_boolean(message, encoding, self))
+    // }
+
+
+
+    pub fn encrypt_arithmetic(&self, message: u32, encoding : &Encoding) -> Ciphertext {
         assert!(encoding.is_canonical());
-        BooleanEngine::with_thread_local_mut(|engine| engine.encrypt(message, encoding, self))
+        BooleanEngine::with_thread_local_mut(|engine| engine.encrypt_arithmetic(message, encoding, self))
     }
 
     
@@ -93,14 +99,19 @@ impl ClientKey {
     /// assert_eq!(true, dec);
     /// # }
     /// ```
-    pub fn decrypt(&self, ct: &Ciphertext, encoding : &Encoding) -> bool {
-        BooleanEngine::with_thread_local_mut(|engine| engine.decrypt(ct, encoding, self))
+    pub fn decrypt(&self, ct: &Ciphertext) -> u32 {
+        BooleanEngine::with_thread_local_mut(|engine| engine.decrypt(ct, self))
     }
 
 
     ////////debug////////
-    pub fn decrypt_float_over_the_torus(&self, ct: &Ciphertext, encoding : &Encoding) -> f64{
-        BooleanEngine::with_thread_local_mut(|engine| engine.decrypt_float_over_the_torus(ct, encoding, self))
+    pub fn decrypt_float_over_the_torus(&self, ct: &Ciphertext) -> f64{
+        BooleanEngine::with_thread_local_mut(|engine| engine.decrypt_float_over_the_torus(ct, self))
+    }
+
+
+    pub fn test_mvb(&self, ct : &GlweCiphertext<Vec<u32>>){
+        BooleanEngine::with_thread_local_mut(|engine| engine.test_mvb(ct, self))
     }
     //////////////////////
 

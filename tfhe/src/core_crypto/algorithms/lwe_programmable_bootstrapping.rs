@@ -1110,6 +1110,57 @@ pub fn programmable_bootstrap_lwe_ciphertext_mem_optimized<
     );
 }
 
+
+
+pub fn programmable_bootstrap_lwe_ciphertext_without_sample_extract_mem_optimized<
+    Scalar,
+    InputCont,
+    OutputCont,
+    AccCont,
+    KeyCont,
+    >(
+    input: &LweCiphertext<InputCont>,
+    output: &mut GlweCiphertext<OutputCont>,
+    accumulator: &GlweCiphertext<AccCont>,
+    fourier_bsk: &FourierLweBootstrapKey<KeyCont>,
+    fft: FftView<'_>,
+    stack: PodStack<'_>,
+    ) where
+    // CastInto required for PBS modulus switch which returns a usize
+    Scalar: UnsignedTorus + CastInto<usize>,
+    InputCont: Container<Element = Scalar>,
+    OutputCont: ContainerMut<Element = Scalar>,
+    AccCont: Container<Element = Scalar>,
+    KeyCont: Container<Element = c64>,
+    {
+    assert_eq!(
+        input.ciphertext_modulus(),
+        output.ciphertext_modulus(),
+        "Mismatched moduli between input ({:?}) and output ({:?})",
+        input.ciphertext_modulus(),
+        output.ciphertext_modulus()
+    );
+
+    assert_eq!(
+        accumulator.ciphertext_modulus(),
+        output.ciphertext_modulus(),
+        "Mismatched moduli between accumulator ({:?}) and output ({:?})",
+        accumulator.ciphertext_modulus(),
+        output.ciphertext_modulus()
+    );
+
+
+
+    fourier_bsk.as_view().bootstrap_without_sample_extract(
+        output.as_mut_view(),
+        input.as_view(),
+        accumulator.as_view(),
+        fft,
+        stack,
+    );
+}
+
+
 /// Return the required memory for [`programmable_bootstrap_lwe_ciphertext_mem_optimized`].
 pub fn programmable_bootstrap_lwe_ciphertext_mem_optimized_requirement<Scalar>(
     glwe_size: GlweSize,

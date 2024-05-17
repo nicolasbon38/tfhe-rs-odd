@@ -3,15 +3,20 @@
 //! Engines are required to abstract cryptographic notions and efficiently manage memory from the
 //! underlying `core_crypto` module.
 
+use crate::core_crypto::prelude::Container;
+use crate::core_crypto::prelude::ContiguousEntityContainer;
 use crate::core_crypto::prelude::EncryptionKeyChoice;
 use crate::core_crypto::prelude::CiphertextModulus;
+use crate::core_crypto::prelude::LweSize;
+use crate::core_crypto::prelude::MonomialDegree;
 use crate::core_crypto::prelude::PBSOrder;
-use crate::gadget::ciphertext::Ciphertext;
-use crate::gadget::parameters::BooleanParameters;
-use crate::gadget::ClientKey;
+use crate::core_crypto::prelude::PlaintextCount;
+use crate::gadget::prelude::*;
 use crate::core_crypto::algorithms::*;
 use crate::core_crypto::entities::*;
 use std::cell::RefCell;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 pub mod bootstrapping;
 use crate::gadget::engine::bootstrapping::{Bootstrapper, ServerKey};
 use crate::core_crypto::commons::generators::{
@@ -20,6 +25,7 @@ use crate::core_crypto::commons::generators::{
 use crate::core_crypto::commons::math::random::{ActivatedRandomGenerator, Seeder};
 //use crate::core_crypto::commons::parameters::*;
 use crate::core_crypto::seeders::new_seeder;
+
 
 use super::ciphertext::Encoding;
 
@@ -111,20 +117,8 @@ impl BooleanEngine {
         Ciphertext::Trivial(message)
     }
 
-    pub fn encrypt(&mut self, message: bool, encoding : &Encoding, cks: &ClientKey) -> Ciphertext {
-        let (new_false, new_true) = encoding.get_values_if_canonical();
-        
-        // encode the boolean message
-        let plain: Plaintext<u32> = if message {
-            let buffer : u64 = (1 << 32) / encoding.get_modulus() as u64 * new_true as u64;
-            Plaintext(buffer as u32)
-        } else {
-            let buffer : u64 = (1 << 32) / encoding.get_modulus() as u64 * new_false as u64;
 
-            Plaintext(buffer as u32)
-        };
-
-
+    fn encryption_from_plaintext(&mut self, cks : &ClientKey, plaintext : Plaintext<u32>) -> LweCiphertext<Vec<u32>>{
         let (lwe_sk, encryption_noise) = match cks.parameters.encryption_key_choice {
             EncryptionKeyChoice::Big => (
                 cks.glwe_secret_key.as_lwe_secret_key(),
@@ -136,60 +130,109 @@ impl BooleanEngine {
             }
         };
 
-        let ct = allocate_and_encrypt_new_lwe_ciphertext(
+        allocate_and_encrypt_new_lwe_ciphertext(
             &lwe_sk,
-            plain,
+            plaintext,
             encryption_noise,
             CiphertextModulus::new_native(),
             &mut self.encryption_generator,
-        );
-
-        Ciphertext::Encrypted(ct)
-
+        )
     }
 
 
 
+    // pub fn encrypt_boolean(&mut self, message: bool, encoding : &BooleanEncoding, cks: &ClientKey) -> Ciphertext {
+    //     let (new_false, new_true) = encoding.get_values_if_canonical();
+        
+    //     // encode the boolean message
+    //     let buffer : u64 = if message {
+    //         (1 << 32) / encoding.get_modulus() as u64 * new_true as u64
+    //     } else {
+    //         (1 << 32) / encoding.get_modulus() as u64 * new_false as u64
+    //     };
+    //     let plain =  Plaintext(buffer as u32);
+    //     let ct = self.encryption_from_plaintext(cks, plain);
+    //     Ciphertext::BooleanEncrypted(ct, encoding.clone())
+    // }
 
-    pub fn decrypt(&mut self, ct: &Ciphertext, encoding : &Encoding, cks: &ClientKey) -> bool {
-        match ct {
-            Ciphertext::Trivial(b) => *b,
-            Ciphertext::Encrypted(ciphertext) => {
-                let lwe_sk = match cks.parameters.encryption_key_choice {
-                    EncryptionKeyChoice::Big => cks.glwe_secret_key.as_lwe_secret_key(),
-                    EncryptionKeyChoice::Small => {
-                        LweSecretKey::from_container(cks.lwe_secret_key.as_ref())
-                    }
-                };
 
-                // decryption
-                let decrypted = decrypt_lwe_ciphertext(&lwe_sk, ciphertext);
+    pub fn encrypt_arithmetic(&mut self, message : u32, encoding : &Encoding, cks : &ClientKey) -> Ciphertext{
+        assert!(message < encoding.get_origin_modulus());
 
-                // cast as a u64
-                let decrypted_u64 = decrypted.0 as u64;
-                //println!("Debug : decrypted : {:#034b}", decrypted_u32);
+        //  Encode the arithmetic message over Zp
+        let zpelem = encoding.get_part_single_value_if_canonical(message);
+        let buffer : u64 = (1 << 32) / encoding.get_modulus() as u64 * zpelem as u64;
+        let plain = Plaintext(buffer as u32);
 
-                
-                let divisor : u64 = 1 << 32;
-                let divisor_float = divisor as f64;
-                let slice : f64 = encoding.get_modulus() as f64 / divisor_float;
-                // println!("Debug : decrypted : {}, on Zp : {}", decrypted_u64, decrypted_u64 as f64 / divisor_float * encoding.get_modulus() as f64);
+        let ct = self.encryption_from_plaintext(cks, plain);
+        Ciphertext::EncodingEncrypted(ct, encoding.clone())
+    }
 
-                let closest_integer = (decrypted_u64 as f64 * slice).round() as u32 % encoding.get_modulus();
 
-                // return
-                if encoding.is_partition_containing(true, closest_integer) { true }
-                else if encoding.is_partition_containing(false, closest_integer) { false }
-                else{ panic!("Decryption failed : la valeur {} n'est dans les partitions booléenes de l'encodage", closest_integer)}
+    pub fn decrypt(&mut self, ct: &Ciphertext, cks: &ClientKey) -> u32 {
+        let lwe_sk = match cks.parameters.encryption_key_choice {
+            EncryptionKeyChoice::Big => cks.glwe_secret_key.as_lwe_secret_key(),
+            EncryptionKeyChoice::Small => {
+                LweSecretKey::from_container(cks.lwe_secret_key.as_ref())
             }
+        };
+        match ct {
+            Ciphertext::Trivial(b) => if *b {1} else {0},
+            Ciphertext::EncodingEncrypted(ciphertext, encoding) => {Self::decrypt_arithmetic(&lwe_sk, ciphertext, encoding)}
         }
     }
 
 
-    pub fn decrypt_float_over_the_torus(&mut self, ct: &Ciphertext, encoding : &Encoding, cks: &ClientKey) -> f64 {
+
+    // fn decrypt_boolean(lwe_sk : &LweSecretKey<&[u32]>, ciphertext : &LweCiphertext<Vec<u32>>, encoding : &BooleanEncoding) -> u32{
+    //     // decryption
+    //     let decrypted = decrypt_lwe_ciphertext(&lwe_sk, ciphertext);
+
+    //     // cast as a u64
+    //     let decrypted_u64 = decrypted.0 as u64;
+    //     //println!("Debug : decrypted : {:#034b}", decrypted_u32);
+
+    //     let divisor : u64 = 1 << 32;
+    //     let divisor_float = divisor as f64;
+    //     let slice : f64 = encoding.get_modulus() as f64 / divisor_float;
+    //     // println!("Debug : decrypted : {}, on Zp : {}", decrypted_u64, decrypted_u64 as f64 / divisor_float * encoding.get_modulus() as f64);
+
+    //     let closest_integer = (decrypted_u64 as f64 * slice).round() as u32 % encoding.get_modulus();
+        
+    //     if encoding.is_partition_containing(true, closest_integer) { 1 }
+    //     else if encoding.is_partition_containing(false, closest_integer) { 0 }
+    //     else{ panic!("Decryption failed : la valeur {} n'est dans les partitions booléenes de l'encodage", closest_integer)}                 
+    // }
+
+
+    fn decrypt_arithmetic(lwe_sk : &LweSecretKey<&[u32]>, ciphertext : &LweCiphertext<Vec<u32>>, encoding : &Encoding) -> u32{
+        // decryption
+        let decrypted = decrypt_lwe_ciphertext(&lwe_sk, ciphertext);
+
+        // cast as a u64
+        let decrypted_u64 = decrypted.0 as u64;
+        //println!("Debug : decrypted : {:#034b}", decrypted_u32);
+
+        let divisor : u64 = 1 << 32;
+        let divisor_float = divisor as f64;
+        let slice : f64 = encoding.get_modulus() as f64 / divisor_float;
+        // println!("Debug : decrypted : {}, on Zp : {}", decrypted_u64, decrypted_u64 as f64 / divisor_float * encoding.get_modulus() as f64);
+
+        let floating_result = decrypted_u64 as f64 * slice;
+
+        let closest_integer = floating_result.round() as u32 % encoding.get_modulus();
+        
+        for i in 0..encoding.get_origin_modulus(){
+            if encoding.is_partition_containing(i, closest_integer) {return i;}
+        }
+        panic!("No value in Zo has been found for : {}.", floating_result);
+    }
+        
+
+    pub fn decrypt_float_over_the_torus(&mut self, ct: &Ciphertext, cks: &ClientKey) -> f64 {
         match ct {
-            Ciphertext::Trivial(b) => panic!("No error level with trivial ciphertext"),
-            Ciphertext::Encrypted(ciphertext) => {
+            Ciphertext::Trivial(_) => panic!("No error level with trivial ciphertext"),
+            Ciphertext::EncodingEncrypted(ciphertext, encoding) => {
                 let lwe_sk = match cks.parameters.encryption_key_choice {
                     EncryptionKeyChoice::Big => cks.glwe_secret_key.as_lwe_secret_key(),
                     EncryptionKeyChoice::Small => {
@@ -209,13 +252,23 @@ impl BooleanEngine {
                 let slice : f64 = encoding.get_modulus() as f64 / divisor_float;
                 // println!("Debug : decrypted : {}, on Zp : {}", decrypted_u64, decrypted_u64 as f64 / divisor_float * encoding.get_modulus() as f64);
 
-                let closest_integer = (decrypted_u64 as f64 * slice).round() as u32 % encoding.get_modulus();
+                let _closest_integer = (decrypted_u64 as f64 * slice).round() as u32 % encoding.get_modulus();
                 // println!("Closest integer : {}", closest_integer);
 
                 decrypted_u64 as f64 / divisor_float
-            }
-        }
+            }        }
     }
+
+
+    pub fn test_mvb(&mut self, ct: &GlweCiphertext<Vec<u32>>, client_key : &ClientKey){
+        for i in 0..client_key.parameters.polynomial_size.0{
+            let mut output_lwe = LweCiphertext::new(0, LweSize(client_key.parameters.glwe_dimension.0 * client_key.parameters.polynomial_size.0 + 1), CiphertextModulus::new_native());
+            extract_lwe_sample_from_glwe_ciphertext(ct, &mut output_lwe, MonomialDegree(i));        
+            let decrypted = decrypt_lwe_ciphertext(&client_key.glwe_secret_key.as_lwe_secret_key(), &output_lwe);
+            println!("{} -> {}", decrypted.0, decrypted.0 as f64 / (1u64<<32) as f64 * 17f64);
+        }
+    }   
+
 
 }
 
@@ -242,11 +295,12 @@ impl BooleanEngine{
         // compute the sum
         input.iter().enumerate().for_each(|(i, x)| {
             match x {
-                Ciphertext::Encrypted(x_ct) => {
+                Ciphertext::EncodingEncrypted(x_ct, _) => {
                     lwe_ciphertext_add_assign(&mut buffer_lwe_before_pbs, &x_ct);
                 }
                 Ciphertext::Trivial(x_bool) => {
-                    let plaintext : u64 = (((enc_in[i].get_mono_encoding(*x_bool) as u64) << 32) / enc_in[i].get_modulus() as u64).into();
+                    let x_int = match x_bool {true => 1, false => 0};
+                    let plaintext : u64 = (((enc_in[i].get_part_single_value_if_canonical(x_int) as u64) << 32) / enc_in[i].get_modulus() as u64).into();
                     lwe_ciphertext_plaintext_add_assign(&mut buffer_lwe_before_pbs, Plaintext(plaintext as u32));
                 }
             }
@@ -259,8 +313,120 @@ impl BooleanEngine{
     }
 
 
+    pub fn apply_lut(&mut self, input : &Ciphertext, output_encoding : &Encoding, f : &dyn Fn(u32) -> u32, server_key : &ServerKey) -> Ciphertext{
+        match input{
+            Ciphertext::EncodingEncrypted(c, enc_in) =>{
+                let bootstrapper = &mut self.bootstrapper;
+                let enc_inter = enc_in.apply_lut_to_encoding(f);
+                bootstrapper
+                .apply_bootstrapping_pattern(c.clone(), &enc_inter, output_encoding, server_key)
+            }
+            _ => panic!()
+        }
+    }
 
-    pub fn cast_encoding(&mut self, input : &Ciphertext, coefficient : u32, server_key : &ServerKey) -> Ciphertext{
+
+    pub fn mvb(&mut self, input : &Ciphertext, output_encodings : &Vec<Encoding>, lut_fis : &Vec<Vec<u32>>, server_key : &ServerKey) -> Vec<Ciphertext>{
+        match input {
+            Ciphertext::EncodingEncrypted(c, input_encoding) => {
+                let bootstrapper = &mut self.bootstrapper;
+                match server_key.pbs_order {
+                    PBSOrder::BootstrapKeyswitch =>{
+                        let cis = bootstrapper.mvb_bootstrap(c.clone(),  input_encoding, output_encodings, lut_fis, server_key);
+                        //keyswitching
+                        cis.iter()
+                            .map(|ci| server_key.keyswitch(ci))
+                            .zip(output_encodings)
+                            .map(|(ci, enc_i)| Ciphertext::EncodingEncrypted(ci, enc_i.clone()))
+                            .collect()
+                    },
+                    PBSOrder::KeyswitchBootstrap =>{
+                        let c_after_ks = server_key.keyswitch(c);
+                        let cis: Vec<LweCiphertext<Vec<u32>>> = bootstrapper.mvb_bootstrap(c_after_ks,  input_encoding, output_encodings, lut_fis, server_key);
+                        cis.iter()
+                            .zip(output_encodings)
+                            .map(|(ci, enc_i)| Ciphertext::EncodingEncrypted(ci.clone(), enc_i.clone()))
+                            .collect()
+                    }
+                }
+            },
+            _ => panic!()
+        }
+    }
+
+
+    pub fn decrypt_glwe_with_builtin_function<OutputCont>(client_key_debug : &ClientKey, glwe_ciphertext : &GlweCiphertext<OutputCont>) where
+    OutputCont: Container<Element = u32>,
+        {
+            let mut plaintext_list = PlaintextList::new(0u32, PlaintextCount(glwe_ciphertext.polynomial_size().0));
+            decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_ciphertext, &mut plaintext_list);
+            plaintext_list.iter().for_each(|plaintext|println!("{:032b} = {} / {}", plaintext.0, (*plaintext.0 as f64 / (1u64 << 32) as f64 * 5.0).round(), plaintext.0) );
+        }
+
+
+
+    pub fn simple_tree_bootstrapping(&mut self, inputs : &Vec<Ciphertext>, encoding_out : &Encoding, t : u32, lut_fi : Vec<u32>, server_key : &ServerKey, _client_key_debug : &ClientKey, log : bool) -> Ciphertext{
+        let c_0 = inputs[1].clone();
+        match c_0 {
+            Ciphertext::EncodingEncrypted(lwe_c_0, encoding_in_0) => {
+                let bootstrapper = &mut self.bootstrapper;
+
+                let o_0 = encoding_in_0.get_origin_modulus();
+                
+                let first_functions: Vec<Vec<u32>> = (0..t / o_0)
+                    .map(|j: u32| {
+                       (0..o_0).map(|x| lut_fi[(x + j * o_0) as usize]).collect()
+                    })
+                    .collect();     // x \in [0, o_0[
+
+                match server_key.pbs_order{
+                    PBSOrder::BootstrapKeyswitch =>{
+                        panic!()
+                    }
+                    PBSOrder::KeyswitchBootstrap =>{
+                        let lwe_c_0_after_ks = server_key.keyswitch(&lwe_c_0);
+                        if log {        println!("TIMING POST_FIRST_KEYSWITCH_TREE ? {:?}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap());     }
+
+                        let first_ciphertexts = bootstrapper.mvb_bootstrap(lwe_c_0_after_ks, &encoding_in_0, &vec![encoding_out.clone();(t/o_0).try_into().unwrap()], &first_functions, &server_key);
+                        if log {        println!("TIMING POST_MVB_TREE ? {:?}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap());     }
+
+                        let next_accumulator = bootstrapper.pack_into_new_accumulator(first_ciphertexts, server_key, encoding_in_0.get_modulus());     
+                        if log {        println!("TIMING POST_PACKING_TREE ? {:?}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap());     }
+
+                        // Self::decrypt_glwe_with_builtin_function(&client_key_debug, &next_accumulator);    
+                        // println!("--------------------------------------");
+
+                        //for now, only depth-2 trees
+                        
+                        let c_1 = inputs[0].clone();
+                        match c_1{
+                            Ciphertext::EncodingEncrypted(lwe_c_1, _) => {
+                                //we assume that they both hve the same input encoding
+                                let lwe_c_1_after_ks = server_key.keyswitch(&lwe_c_1);
+                                if log {        println!("TIMING POST_SECOND_KEYSWITCH_TREE ? {:?}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap());     }
+
+                                let final_lwe = bootstrapper.bootstrap(&lwe_c_1_after_ks, &next_accumulator, server_key);
+                                if log {        println!("TIMING POST_SIMPLE_BOOTSTRAPPING_IN_TREE ? {:?}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap());     }
+
+                                Ciphertext::EncodingEncrypted(final_lwe, encoding_out.clone())
+                                },
+                            _ => panic!()
+                        }
+
+                        
+                        
+                    }
+                }
+
+
+            },
+            Ciphertext::Trivial(_) => {panic!()}
+        }
+    }
+
+
+
+    pub fn encoding_switching_mul_constant(&mut self, input : &Ciphertext, coefficient : u32, server_key : &ServerKey) -> Ciphertext{
         
         let size = match server_key.pbs_order{
             PBSOrder::KeyswitchBootstrap => server_key.key_switching_key.input_key_lwe_dimension().to_lwe_size(),
@@ -274,9 +440,10 @@ impl BooleanEngine{
         // compute the product with the coefficient
         let c = Cleartext(coefficient);
         match input {
-            Ciphertext::Encrypted(x_ct) => {
+            Ciphertext::EncodingEncrypted(x_ct, encoding) => {
                 lwe_ciphertext_cleartext_mul(&mut result, &x_ct, c);
-                Ciphertext::Encrypted(result)
+                let new_encoding = encoding.multiply_encoding_by_constant(coefficient);
+                Ciphertext::EncodingEncrypted(result, new_encoding)
             }
             Ciphertext::Trivial(_) => {
                 panic!("Error : casting a trivial ciphertext ! ");
@@ -286,6 +453,7 @@ impl BooleanEngine{
 
 
 
+    // Warning : To use only for parity encodings !
     pub fn simple_sum(&mut self, input : &Vec<Ciphertext>, server_key : &ServerKey) -> Ciphertext{
         let size = match server_key.pbs_order{
             PBSOrder::KeyswitchBootstrap => server_key.key_switching_key.input_key_lwe_dimension().to_lwe_size(),
@@ -299,7 +467,7 @@ impl BooleanEngine{
         );
         input.iter().for_each(|x| 
             match x{
-                Ciphertext::Encrypted(x_ct) => {
+                Ciphertext::EncodingEncrypted(x_ct, _) => {
                     lwe_ciphertext_add_assign(&mut result, x_ct);
                 }
                 Ciphertext::Trivial(_) => {
@@ -307,7 +475,7 @@ impl BooleanEngine{
                 }
             }
         );
-        Ciphertext::Encrypted(result)
+        Ciphertext::EncodingEncrypted(result, Encoding::parity_encoding())
     }
 
 
@@ -327,17 +495,44 @@ impl BooleanEngine{
         let buffer_value : u64 = (1 << 32) / modulus as u64 * constant as u64;
         let value = Plaintext(buffer_value as u32);
         match input{
-            Ciphertext::Encrypted(x_ct) => {
+            Ciphertext::EncodingEncrypted(x_ct, encoding) => {
                 lwe_ciphertext_plaintext_add_assign(&mut result, value);
                 lwe_ciphertext_add_assign(&mut result, x_ct);
+                Ciphertext::EncodingEncrypted(result, encoding.clone())
             }
             Ciphertext::Trivial(_) => {
                 panic!("don't use trivial encryption in this context")
             }
         }
-        Ciphertext::Encrypted(result)
     }
 
+
+    pub fn encoding_switching_sum_constant(&mut self, input : &Ciphertext, constant : u32, modulus : u32, server_key : &ServerKey) -> Ciphertext{
+        
+        let size = match server_key.pbs_order{
+            PBSOrder::KeyswitchBootstrap => server_key.key_switching_key.input_key_lwe_dimension().to_lwe_size(),
+            PBSOrder::BootstrapKeyswitch => server_key.bootstrapping_key.input_lwe_dimension().to_lwe_size()
+        };
+
+        let mut result = LweCiphertext::new(
+            0u32,
+            size,
+                CiphertextModulus::new_native(),
+
+        );        
+        let buffer_value : u64 = (1 << 32) / modulus as u64 * constant as u64;
+        let value = Plaintext(buffer_value as u32);
+        match input{
+            Ciphertext::EncodingEncrypted(x_ct, encoding) => {
+                lwe_ciphertext_plaintext_add_assign(&mut result, value);
+                lwe_ciphertext_add_assign(&mut result, x_ct);
+                Ciphertext::EncodingEncrypted(result, encoding.add_constant(constant))
+            }
+            Ciphertext::Trivial(_) => {
+                panic!("don't use trivial encryption in this context")
+            }
+        }
+    }
 }
 
 //////////
@@ -370,31 +565,5 @@ impl BooleanEngine {
             bootstrapper: Bootstrapper::new(&mut deterministic_seeder),
         }
     }
-
-    // /// convert into an actual LWE ciphertext even when trivial
-    // fn convert_into_lwe_ciphertext_32(
-    //     &mut self,
-    //     ct: &Ciphertext,
-    //     server_key: &ServerKey,
-    // ) -> LweCiphertextOwned<u32> {
-    //     match ct {
-    //         Ciphertext::Encrypted(ct_ct) => ct_ct.clone(),
-    //         Ciphertext::Trivial(message) => {
-    //             // encode the boolean message
-    //             let plain: Plaintext<u32> = if *message {
-    //                 Plaintext(PLAINTEXT_TRUE)
-    //             } else {
-    //                 Plaintext(PLAINTEXT_FALSE)
-    //             };
-    //             allocate_and_trivially_encrypt_new_lwe_ciphertext(
-    //                 server_key
-    //                     .bootstrapping_key
-    //                     .input_lwe_dimension()
-    //                     .to_lwe_size(),
-    //                 plain,
-    //             )
-    //         }
-    //     }
-    // }
 }
 

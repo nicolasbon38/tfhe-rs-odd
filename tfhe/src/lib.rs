@@ -94,7 +94,7 @@ pub mod shortint;
 
 
 #[cfg(feature = "gadget")]
-/// Welcome to the TFHE-rs [`shortint`](`crate::shortint`) module documentation!
+/// Welcome to the TFHE-rs [`gadget`](`crate::gadget`) module documentation!
 ///
 /// # Special module attributes
 /// cbindgen:ignore

@@ -8,7 +8,7 @@ pub struct Gadget{
     encoding_inter : Encoding,
     encoding_out : Encoding,
     size_input : u32,
-    true_result : Vec<bool> //index of an element encodes the input}
+    true_result : Vec<u32> //index of an element encodes the input
 }
 
 
@@ -17,8 +17,8 @@ pub struct Gadget{
 impl Gadget{
 
     pub fn pretty_print(&self){
-        self.encodings_in.iter().for_each(|e| print!("{}|", e.get_mono_encoding(true)));
-        println!(" -> {}", self.encoding_out.get_mono_encoding(true));
+        self.encodings_in.iter().for_each(|e| print!("{}|", e.get_part_single_value_if_canonical(1)));
+        println!(" -> {}", self.encoding_out.get_part_single_value_if_canonical(1));
     }
 
     pub fn get_encoding_in(&self, index : usize) -> &Encoding{
@@ -41,31 +41,31 @@ impl Gadget{
 
 
 
-    pub fn new(encodings_in : Vec<Encoding>, encoding_inter : Encoding, encoding_out : Encoding, size_input : u32, true_fn : &dyn Fn(Vec<bool>) -> bool) -> Self{
+    pub fn new(encodings_in : Vec<Encoding>, encoding_inter : Encoding, encoding_out : Encoding, size_input : u32, true_fn : &dyn Fn(Vec<u32>) -> u32) -> Self{
         for e in &encodings_in{
             assert!(e.is_canonical());
         }
         assert!(encoding_out.is_canonical());
-        let true_result : Vec<bool> = (0..1<<size_input).map(|x| true_fn(Self::split_int_in_booleans(x, size_input.try_into().unwrap(), false))).collect();
+        let true_result : Vec<u32> = (0..1<<size_input).map(|x| true_fn(Self::split_int_in_booleans(x, size_input.try_into().unwrap(), false))).collect();
         Self{
             encodings_in, encoding_inter, encoding_out, size_input, true_result
         }
     }
 
 
-    pub fn new_canonical(qis : Vec<u32>,  q_out : u32, p_in : u32, p_out : u32,  size_input : u32, true_fn : &dyn Fn(Vec<bool>) -> bool) -> Self{
-        let encodings_in : Vec<Encoding> = qis.iter().map(|x| Encoding::new_canonical(*x, p_in)).collect();
-        Self::new(encodings_in, Self::compute_canonical_encoding_inter(&qis, p_in, size_input, true_fn), Encoding::new_canonical(q_out, p_out), size_input, true_fn)
+    pub fn new_canonical(qis : Vec<u32>,  q_out : u32, p_in : u32, p_out : u32,  size_input : u32, true_fn : &dyn Fn(Vec<u32>) -> u32) -> Self{
+        let encodings_in : Vec<Encoding> = qis.iter().map(|x| Encoding::new_canonical_binary(*x, p_in)).collect();
+        Self::new(encodings_in, Self::compute_sum_encodings_from_canonical_binary(&qis, p_in, size_input, true_fn), Encoding::new_canonical_binary(q_out, p_out), size_input, true_fn)
     }
 
 
-    fn compute_canonical_encoding_inter(qis : &Vec<u32>, p : u32, size_input : u32, true_fn : &dyn Fn(Vec<bool>) -> bool) -> Encoding{
+    fn compute_sum_encodings_from_canonical_binary(qis : &Vec<u32>, p : u32, size_input : u32, true_fn : &dyn Fn(Vec<u32>) -> u32) -> Encoding{
         let mut part_false : HashSet<u32> = HashSet::new();
         let mut part_true : HashSet<u32> = HashSet::new();
         for i in 0..1<<size_input{
             let input = Self::split_int_in_booleans(i, size_input as usize, true);
-            let result : u32 = input.iter().zip(qis).map(|(b, q)| if *b {*q} else {0}).sum::<u32>() % p;
-            if true_fn(input){
+            let result : u32 = input.iter().zip(qis).map(|(b, q)| if *b == 1 {*q} else {0}).sum::<u32>() % p;
+            if true_fn(input) == 1{
                 assert!(! part_false.contains(&result));
                 part_true.insert(result);
             }
@@ -74,12 +74,12 @@ impl Gadget{
                 part_false.insert(result);
             }
         }
-        Encoding::new(part_false, part_true, p)
+        Encoding::new(2, vec![part_false, part_true], p)
     }
 
 
 
-    pub fn split_int_in_booleans(x : u32, expected_length : usize, big_endian : bool) -> Vec<bool>{
+    pub fn split_int_in_booleans(x : u32, expected_length : usize, big_endian : bool) -> Vec<u32>{
         //util function
         let mut res = Vec::new();
         let mut y = x;
@@ -88,12 +88,13 @@ impl Gadget{
             y = y >> 1;
         }
         (0..expected_length - res.len()).for_each(|_i| res.push(false));
-        if big_endian{  res.reverse(); }
-        res
+        let mut res_integer : Vec<u32> = res.iter().map(|x| if *x {1} else {0}).collect();
+        if big_endian{  res_integer.reverse(); }
+        res_integer
     }
 
 
-    fn vec_bool_to_int(x : Vec<bool>, big_endian : bool) -> u32{
+    pub fn vec_bool_to_int(x : Vec<u32>, big_endian : bool) -> u32{
         let mut index = 0;
         let mut x_copy = x.clone();
         if big_endian{
@@ -101,7 +102,7 @@ impl Gadget{
         }
         x_copy.iter()
         .enumerate()
-        .for_each(|(i, x)| if *x {index = index + (1 << i)});
+        .for_each(|(i, x)| if *x == 1 {index = index + (1 << i)});
         index
     }
 
@@ -113,27 +114,35 @@ impl Gadget{
             c_clear.iter().for_each(|x| print!("| {} ", *x));
             println!(" -> {}", self.true_result[x as usize]);
             let c: Vec<Ciphertext> = c_clear.iter().enumerate().map(
-                |(i, x_i)| client_key.encrypt(*x_i, &self.encodings_in[i])
+                |(i, x_i)| client_key.encrypt_arithmetic(*x_i, &self.encodings_in[i])
             ).collect();
             let res: Ciphertext = self.exec(&c, &server_key);
-            if client_key.decrypt(&res, &self.encoding_out) == self.true_result[x as usize]{  
+            if client_key.decrypt(&res) == self.true_result[x as usize]{  
                 println!("valid");
             }
             else{
-                println!("failed with float {}", client_key.decrypt_float_over_the_torus(&res, &self.encoding_out));
+                println!("failed with float {}", client_key.decrypt_float_over_the_torus(&res));
             }
-            assert_eq!(client_key.decrypt(&res, &self.encoding_out), self.true_result[Self::vec_bool_to_int(c_clear, false) as usize]);
+            assert_eq!(client_key.decrypt(&res), self.true_result[Self::vec_bool_to_int(c_clear, false) as usize]);
         }
         println!("TEST OK !");
     }
 
+    
 
-    pub fn exec_clear(&self, input : Vec<bool>) -> bool{
+
+    pub fn exec_clear(&self, input : Vec<u32>) -> u32{
         self.true_result[Self::vec_bool_to_int(input, false) as usize]
     }
 
     
     pub fn exec(&self, input : &Vec<Ciphertext>, server_key : &ServerKey) -> Ciphertext{
+        input.iter().zip(self.encodings_in.clone()).for_each(|(e_1, e_2)| {
+            match e_1{
+                Ciphertext::EncodingEncrypted(_, enc_1) => assert_eq!(*enc_1, e_2),
+                Ciphertext::Trivial(_) => {}
+            }
+        });
         server_key.exec_gadget_with_extraction(&self.encodings_in, &self.encoding_inter, &self.encoding_out, &input)
     }
 
@@ -141,13 +150,13 @@ impl Gadget{
     pub fn cast_before_gadget(&self, coefficients : Vec<u32>, inputs : &Vec<Ciphertext>, server_key : &ServerKey) -> Vec<Ciphertext>{
         // input encodees sous {0}, {1}
         let mut result : Vec<Ciphertext> = Vec::new();
-        inputs.iter().zip(coefficients).for_each(|(x, c)| if c != 0 {result.push(server_key.cast_encoding(x, c))});
+        inputs.iter().zip(coefficients).for_each(|(x, c)| if c != 0 {result.push(server_key.encoding_switching_mul_constant(x, c))});
         result
     }
 
 
     pub fn cast_before_gadget_from_1(&self, inputs : Vec<Ciphertext>, server_key : &ServerKey) -> Vec<Ciphertext>{
-        let coefficients : Vec<u32>= self.encodings_in.iter().map(|e| e.get_mono_encoding(true)).collect();
+        let coefficients : Vec<u32>= self.encodings_in.iter().map(|e| e.get_part_single_value_if_canonical(1)).collect();
         self.cast_before_gadget(coefficients, &inputs, server_key)
     }
 
