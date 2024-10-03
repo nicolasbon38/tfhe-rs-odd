@@ -57,7 +57,7 @@ use crate::gadget::server_key::ServerKey;
 #[cfg(test)]
 use rand::Rng;
 
-use self::prelude::BooleanParameters;
+use self::prelude::GadgetParameters;
 
 
 pub mod ciphertext;
@@ -106,7 +106,7 @@ pub(crate) fn random_integer() -> u64 {
 /// let (cks, sks) = gen_keys();
 /// # }
 /// ```
-pub fn gen_keys(parameters : &BooleanParameters) -> (ClientKey, ServerKey) {
+pub fn gen_keys(parameters : &GadgetParameters) -> (ClientKey, ServerKey) {
     // generate the client key
     let cks = ClientKey::new(&parameters);
 

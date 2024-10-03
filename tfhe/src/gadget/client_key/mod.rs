@@ -4,8 +4,8 @@
 //! encryption and decryption methods.
 
 use crate::gadget::prelude::*;
-use crate::gadget::engine::{BooleanEngine, WithThreadLocalEngine};
-use crate::gadget::parameters::BooleanParameters;
+use crate::gadget::engine::{GadgetEngine, WithThreadLocalEngine};
+use crate::gadget::parameters::GadgetParameters;
 use crate::core_crypto::entities::*;
 use std::fmt::{Debug, Formatter};
 
@@ -23,7 +23,7 @@ use super::ciphertext::Encoding;
 pub struct ClientKey {
     pub(crate) lwe_secret_key: LweSecretKeyOwned<u64>,
     pub(crate) glwe_secret_key: GlweSecretKeyOwned<u64>,
-    pub(crate) parameters: BooleanParameters,
+    pub(crate) parameters: GadgetParameters,
 }
 
 impl PartialEq for ClientKey {
@@ -68,14 +68,14 @@ impl ClientKey {
     /// ```
     // pub fn encrypt_boolean(&self, message: bool, encoding : &BooleanEncoding) -> Ciphertext {
     //     assert!(encoding.is_canonical());
-    //     BooleanEngine::with_thread_local_mut(|engine| engine.encrypt_boolean(message, encoding, self))
+    //     GadgetEngine::with_thread_local_mut(|engine| engine.encrypt_boolean(message, encoding, self))
     // }
 
 
 
     pub fn encrypt_arithmetic(&self, message: u64, encoding : &Encoding) -> Ciphertext {
         assert!(encoding.is_canonical());
-        BooleanEngine::with_thread_local_mut(|engine| engine.encrypt_arithmetic(message, encoding, self))
+        GadgetEngine::with_thread_local_mut(|engine| engine.encrypt_arithmetic(message, encoding, self))
     }
 
     
@@ -100,18 +100,18 @@ impl ClientKey {
     /// # }
     /// ```
     pub fn decrypt(&self, ct: &Ciphertext) -> u64 {
-        BooleanEngine::with_thread_local_mut(|engine| engine.decrypt(ct, self))
+        GadgetEngine::with_thread_local_mut(|engine| engine.decrypt(ct, self))
     }
 
 
     ////////debug////////
     pub fn measure_noise(&self, ct: &Ciphertext) -> i64{
-        BooleanEngine::with_thread_local_mut(|engine| engine.measure_noise(ct, self))
+        GadgetEngine::with_thread_local_mut(|engine| engine.measure_noise(ct, self))
     }
 
 
     pub fn test_mvb(&self, ct : &GlweCiphertext<Vec<u64>>){
-        BooleanEngine::with_thread_local_mut(|engine| engine.test_mvb(ct, self))
+        GadgetEngine::with_thread_local_mut(|engine| engine.test_mvb(ct, self))
     }
     //////////////////////
 
@@ -129,7 +129,7 @@ impl ClientKey {
     /// let cks = ClientKey::new(&TFHE_LIB_PARAMETERS);
     /// # }
     /// ```
-    pub fn new(parameter_set: &BooleanParameters) -> ClientKey {
-        BooleanEngine::with_thread_local_mut(|engine| engine.create_client_key(*parameter_set))
+    pub fn new(parameter_set: &GadgetParameters) -> ClientKey {
+        GadgetEngine::with_thread_local_mut(|engine| engine.create_client_key(*parameter_set))
     }
 }

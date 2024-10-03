@@ -4,7 +4,6 @@ use crate::core_crypto::commons::math::decomposition::{
 };
 use crate::core_crypto::commons::numeric::UnsignedInteger;
 use crate::core_crypto::commons::parameters::{DecompositionBaseLog, DecompositionLevelCount};
-use crate::core_crypto::prelude::{Container, Polynomial};
 
 /// An iterator that yields the terms of the signed decomposition of an integer.
 ///

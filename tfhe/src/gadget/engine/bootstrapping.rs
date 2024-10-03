@@ -71,6 +71,27 @@ impl Memory {
 
 
 
+    pub fn create_accumulator_wopbs(encoding_in : &Encoding, encoding_out : &Encoding) -> Accumulator{
+        assert!(encoding_in.is_valid());
+        assert!(encoding_out.is_canonical());
+        let p = encoding_in.get_modulus();
+        assert!(p % 2 == 0 && p != 2);
+        let mut accu : Accumulator = vec![0;p.try_into().unwrap()];
+        for k in 0..p{
+             //finding the ZoElem i corresponding to this encoding in
+             let i = encoding_in.inverse_encoding(k);
+             //Finding the new ZpElem corresponding to i in encoding out
+             accu[k as usize] = match i{
+                 Some(i) => encoding_out.get_part_single_value_if_canonical(i),
+                 None => 0
+             };
+        }
+        // accu.iter().enumerate().for_each(|(i, x)| print!("{} : {} |", i, x));
+        // println!();
+        accu
+    }
+
+
 
     //common part of memory allocation for bootstrappings
     fn allocate_ciphertexts_for_bootstrapping(&mut self, server_key: &ServerKey)->(GlweCiphertext<&mut[u64]>, LweCiphertext<&mut[u64]>, LweCiphertext<&mut[u64]>){
@@ -136,8 +157,18 @@ impl Memory {
         accumulator.get_mut_mask().as_mut().fill(0u64);
         let N_poly: usize = accumulator.get_mut_body().as_mut().len();    //(N degree of the polynomial)
 
-        if p % 2 == 1{
-            let accu_data = Self::create_accumulator(enc_in, enc_out);
+        if p != 2{  //wopbs is managed in this block as well
+
+            let accu_data = if p % 2 == 1{
+                Self::create_accumulator(enc_in, enc_out)
+            }
+            else{
+                Self::create_accumulator_wopbs(enc_in, enc_out)
+            };
+            // print!("Accumulator:");
+            // accu_data.iter().enumerate().for_each(|(i, x)| print!("{}:{} |", i, x));
+            // println!();
+
             let const_shift = N_poly / (2 * p) as usize;   //half a window
 
             let mut buffer_value : u64 = ((1 << 64) / new_p as u128) as u64 * accu_data[0] as u64;    //value to be written in the accumulator, put in a u64 to enhance the precision of the / operation
@@ -148,8 +179,11 @@ impl Memory {
             }
             buffer_value = ((1 << 64) / new_p as u128) as u64 * ((enc_out.get_modulus() - accu_data[0]) % enc_out.get_modulus()) as u64;
             accumulator.get_mut_body().as_mut()[N_poly  - const_shift..].fill(buffer_value as u64);//filling of the last half-window
+            // // Debug
+            // accumulator.get_body().as_polynomial().iter().for_each(|x| println!("{}", x));
         }
-        else if p == 2{
+        // for now, the case p=2 is still particular
+        else{
             //check that we have negacyclicity
             let new_false = enc_out.get_part_single_value_if_canonical(0);
             let new_true = enc_out.get_part_single_value_if_canonical(1);
@@ -220,6 +254,7 @@ pub struct ServerKey {
     pub(crate) bootstrapping_key: FourierLweBootstrapKeyOwned,
     pub(crate) key_switching_key: LweKeyswitchKeyOwned<u64>,
     pub(crate) lwe_packing_keyswitch_key : LwePackingKeyswitchKeyOwned<u64>,
+    pub(crate) relinearization_key: RelinearizationKey<Vec<u64>>,
     pub(crate) pbs_order: PBSOrder
 }
 
@@ -322,17 +357,27 @@ impl Bootstrapper {
             &cks.glwe_secret_key, 
             cks.parameters.ks_base_log,
             cks.parameters.ks_level,
-            cks.parameters.lwe_modular_std_dev,
+            cks.parameters.glwe_modular_std_dev,
             CiphertextModulus::new_native(),
             &mut self.encryption_generator
         );
 
         //Creation of the lwe_key_switching_packing_keys (for tree bootstrapping)
 
+        let relinearization_key = allocate_and_generate_new_relinearization_key(
+            &cks.glwe_secret_key, 
+            cks.parameters.ks_base_log, 
+            cks.parameters.ks_level, 
+            cks.parameters.glwe_modular_std_dev, 
+            CiphertextModulus::new_native(), 
+            &mut self.encryption_generator
+        );
+
         ServerKey {
             bootstrapping_key: fourier_bsk,
             key_switching_key: ksk,
             lwe_packing_keyswitch_key : packing_ksk,
+            relinearization_key,
             pbs_order: cks.parameters.encryption_key_choice.into(),
         }
     }

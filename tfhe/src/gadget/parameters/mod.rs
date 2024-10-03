@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 /// A set of cryptographic parameters for homomorphic Boolean circuit evaluation.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct BooleanParameters {
+pub struct GadgetParameters {
     pub lwe_dimension: LweDimension,
     pub glwe_dimension: GlweDimension,
     pub polynomial_size: PolynomialSize,
@@ -39,7 +39,7 @@ pub struct BooleanParameters {
     pub encryption_key_choice: EncryptionKeyChoice
 }
 
-impl BooleanParameters {
+impl GadgetParameters {
     /// Constructs a new set of parameters for boolean circuit evaluation.
     ///
     /// # Safety
@@ -60,8 +60,8 @@ impl BooleanParameters {
         ks_base_log: DecompositionBaseLog,
         ks_level: DecompositionLevelCount,
         encryption_key_choice: EncryptionKeyChoice
-    ) -> BooleanParameters {
-        BooleanParameters {
+    ) -> GadgetParameters {
+        GadgetParameters {
             lwe_dimension,
             glwe_dimension,
             polynomial_size,
@@ -81,7 +81,7 @@ impl BooleanParameters {
 /// $2^{-40}$. The secret keys generated with this parameter set are uniform binary.
 /// This parameter set allows to evaluate faster Boolean circuits than the `TFHE_LIB_PARAMETERS`
 /// one.
-pub const DEFAULT_PARAMETERS: BooleanParameters = BooleanParameters {
+pub const DEFAULT_PARAMETERS: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(722),
     glwe_dimension: GlweDimension(2),
     polynomial_size: PolynomialSize(512),
@@ -97,7 +97,7 @@ pub const DEFAULT_PARAMETERS: BooleanParameters = BooleanParameters {
 
 
 // Parameters with AP framework : error probability = 2^-40:
-pub const SIMON_PARAMETERS_40: BooleanParameters = BooleanParameters {
+pub const SIMON_PARAMETERS_40: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(684),
     glwe_dimension: GlweDimension(3),
     polynomial_size: PolynomialSize(512),
@@ -114,7 +114,7 @@ pub const SIMON_PARAMETERS_40: BooleanParameters = BooleanParameters {
 
 
 //papier Zama Trivium
-pub const ZAMA_TRIVIUM_PARAMETERS: BooleanParameters = BooleanParameters {
+pub const ZAMA_TRIVIUM_PARAMETERS: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(684),
     glwe_dimension: GlweDimension(3),
     polynomial_size: PolynomialSize(512),
@@ -131,7 +131,7 @@ pub const ZAMA_TRIVIUM_PARAMETERS: BooleanParameters = BooleanParameters {
 
 
 ////Paramètres proba erreur 2^-40
-pub const ASCON_PARAMETERS_40: BooleanParameters = BooleanParameters {
+pub const ASCON_PARAMETERS_40: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(740),
     glwe_dimension: GlweDimension(2),
     polynomial_size: PolynomialSize(1024),
@@ -145,7 +145,7 @@ pub const ASCON_PARAMETERS_40: BooleanParameters = BooleanParameters {
 };
 
 //parameters for 40 bits of security
-pub const SHA3_PARAMETERS_40: BooleanParameters = BooleanParameters {
+pub const SHA3_PARAMETERS_40: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(676),
     glwe_dimension: GlweDimension(5),
     polynomial_size: PolynomialSize(256),
@@ -164,7 +164,7 @@ pub const SHA3_PARAMETERS_40: BooleanParameters = BooleanParameters {
 
 
 
-pub const AES_PARAMETERS_40: BooleanParameters = BooleanParameters {
+pub const AES_PARAMETERS_40: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(708),
     glwe_dimension: GlweDimension(3),
     polynomial_size: PolynomialSize(512),
@@ -185,7 +185,7 @@ pub const AES_PARAMETERS_40: BooleanParameters = BooleanParameters {
 
 
 
-pub const AES_PARAMETERS_23: BooleanParameters = BooleanParameters {
+pub const AES_PARAMETERS_23: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(672),
     glwe_dimension: GlweDimension(3),
     polynomial_size: PolynomialSize(512),
@@ -205,7 +205,7 @@ pub const AES_PARAMETERS_23: BooleanParameters = BooleanParameters {
 /// proposed into [TFHE library](https://tfhe.github.io/tfhe/) for for 128-bits of security.
 /// They are updated to the last security standards, so they differ from the original
 /// publication.
-pub const TFHE_LIB_PARAMETERS: BooleanParameters = BooleanParameters {
+pub const TFHE_LIB_PARAMETERS: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(830),
     glwe_dimension: GlweDimension(2),
     polynomial_size: PolynomialSize(1024),
@@ -221,7 +221,7 @@ pub const TFHE_LIB_PARAMETERS: BooleanParameters = BooleanParameters {
 
 
 // //////dummy parameters to tests the manticore
-pub const MANTICORE_PARAMETERS: BooleanParameters = BooleanParameters {
+pub const MANTICORE_PARAMETERS: GadgetParameters = GadgetParameters {
     lwe_dimension: LweDimension(754),
     glwe_dimension: GlweDimension(1),
     polynomial_size: PolynomialSize(1024),

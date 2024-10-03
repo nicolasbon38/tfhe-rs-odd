@@ -355,6 +355,9 @@ impl<'a> FourierLweBootstrapKeyView<'a> {
             accumulator.ciphertext_modulus(),
         );
         self.blind_rotate_assign(local_accumulator.as_mut_view(), lwe_in.as_ref(), fft, stack);
+        //Debug
+        // println!("Accumulator rotated:");
+        // local_accumulator.get_body().as_polynomial().iter().for_each(|x| println!("{}", x));
 
         extract_lwe_sample_from_glwe_ciphertext(
             &local_accumulator,

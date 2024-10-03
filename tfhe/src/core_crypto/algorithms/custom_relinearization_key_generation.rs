@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 //! Module containing primitives pertaining to [`LWE relinearizaion keys
 //! generation`](`RelinearizationKey`).
 
@@ -7,11 +8,10 @@ use crate::core_crypto::algorithms::encrypt_glwe_ciphertext_list;
 use crate::core_crypto::commons::dispersion::DispersionParameter;
 use crate::core_crypto::commons::generators::EncryptionRandomGenerator;
 use crate::core_crypto::commons::math::decomposition::{DecompositionLevel, DecompositionTerm};
-use crate::core_crypto::commons::math::random::{ActivatedRandomGenerator, ByteRandomGenerator};
 use crate::core_crypto::commons::parameters::*;
 use crate::core_crypto::commons::traits::*;
 use crate::core_crypto::entities::{
-    GlweSecretKey, RelinearizationKey, RelinearizationKeyOwned, LweSecretKey,
+    GlweSecretKey, RelinearizationKey, RelinearizationKeyOwned,
     PlaintextListOwned};
 use crate::core_crypto::prelude::polynomial_algorithms::polynomial_karatsuba_wrapping_mul;
 use crate::core_crypto::prelude::Polynomial;

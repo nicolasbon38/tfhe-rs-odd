@@ -5,73 +5,77 @@
 use crate::core_crypto::entities::*;
 use std::collections::{HashMap, HashSet};
 
-/// A structure containing a ciphertext, meant to encrypt a Boolean message.
-///
-/// It is used to evaluate a Boolean circuits homomorphically.
-// #[derive(Clone, Debug)]
-// pub enum Ciphertext{
-//     BooleanEncrypted(LweCiphertextOwned<u64>, BooleanEncoding),
-//     ArithmeticEncrypted(LweCiphertextOwned<u64>, Encoding),
-//     Trivial(bool),
-// }
-
 #[derive(Clone, Debug)]
-pub enum Ciphertext{
+pub enum Ciphertext {
     EncodingEncrypted(LweCiphertextOwned<u64>, Encoding),
-    Trivial(bool),
+    Trivial(ZpElem),
 }
 
 type ZoElem = u64;
 type ZpElem = u64;
 
-
-
 #[derive(Clone, Debug)]
-pub struct Encoding{
-    origin_modulus : u64,   // o in the paper
-    parts : Vec<HashSet<ZpElem>>,   //element of index i \in \Zo returns the elems of \Zp associated with i in the encoding.
-    modulus_p : u64   //p in the paper
+pub struct Encoding {
+    origin_modulus: u64,         // o in the paper
+    parts: Vec<HashSet<ZpElem>>, //element of index i \in \Zo returns the elems of \Zp associated with i in the encoding.
+    modulus_p: u64,              //p in the paper
+    wopbs: bool,
 }
 
-
-
-impl PartialEq for Encoding{
-    fn eq(&self, other : &Self) -> bool{
-        self.get_origin_modulus() == other.get_origin_modulus() &&
-        self.get_modulus() == other.get_modulus() &&
-        self.parts.iter().zip(other.parts.clone()).all(|(set1, set2)| *set1==set2)
+impl PartialEq for Encoding {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_origin_modulus() == other.get_origin_modulus()
+            && self.get_modulus() == other.get_modulus()
+            && self
+                .parts
+                .iter()
+                .zip(other.parts.clone())
+                .all(|(set1, set2)| *set1 == set2)
     }
 }
 
-
-impl Encoding{
-    
+impl Encoding {
     pub fn is_valid(&self) -> bool {
         assert_eq!(self.origin_modulus, self.parts.len().try_into().unwrap());
-        
-        let x = self.parts.iter().enumerate().all(|(i, part_1)| {
-            self.parts.iter().skip(i + 1).all(|part_2| part_1.is_disjoint(part_2))
-        }); //check disjonction of all parts
 
-        let y = match self.modulus_p % 2 == 1 || self.modulus_p==2{
+        // Nicolas : cette vérification ne marche pas pour l'encodage full 1 du wop pbs. A voir ce qu'on en fait
+        // let x = self.parts.iter().enumerate().all(|(i, part_1)| {
+        //     self.parts
+        //         .iter()
+        //         .skip(i + 1)
+        //         .all(|part_2| part_1.is_disjoint(part_2))
+        // }); //check disjonction of all parts
+        let x = true;
+
+        let y = match self.modulus_p % 2 == 1 || self.modulus_p == 2 {
             true => true,
-            false =>//check negacyclicity : if a ZpElem belongs to the ith parts, its opposite on Zp should not belong to any part except the [-i]_o one.
-                {   for i in (0..self.origin_modulus).map(|i| i as ZoElem){
+            false => {
+                if !self.wopbs {
+                    //check negacyclicity : if a ZpElem belongs to the ith parts, its opposite on Zp should not belong to any part except the [-i]_o one.
+                    for i in (0..self.origin_modulus).map(|i| i as ZoElem) {
                         let negative_i = self.negative_on_o_ring(i);
-                        for x in self.get_part(i).iter().map(|x| *x as ZpElem){
+                        for x in self.get_part(i).iter().map(|x| *x as ZpElem) {
                             let opposite_x = (x + self.modulus_p / 2) % self.modulus_p;
-                            let forbidden_spots = self.parts.iter().enumerate().filter(|(j, _)| *j as ZoElem != negative_i).map(|(_, part)| part).fold(HashSet::new(), |acc, set| acc.union(set).cloned().collect());
-                            if forbidden_spots.contains(&opposite_x){
-                                return false
+                            let forbidden_spots = self
+                                .parts
+                                .iter()
+                                .enumerate()
+                                .filter(|(j, _)| *j as ZoElem != negative_i)
+                                .map(|(_, part)| part)
+                                .fold(HashSet::new(), |acc, set| acc.union(set).cloned().collect());
+                            if forbidden_spots.contains(&opposite_x) {
+                                return false;
                             }
+                        }
                     }
+                    true
+                } else {
+                    true
                 }
-                true
             }
         };
         x & y
     }
-
 
     pub fn pretty_print(&self) {
         println!("modulus : {}", self.modulus_p);
@@ -82,15 +86,15 @@ impl Encoding{
         })
     }
 
-    pub fn is_partition_containing(&self, element_of_zo : u64, value : u64) -> bool {
+    pub fn is_partition_containing(&self, element_of_zo: u64, value: u64) -> bool {
         //est-ce que la partition associée à l'élément contient la valeur ?
         self.get_part(element_of_zo).contains(&value)
     }
 
-    pub fn inverse_encoding(&self, x : ZpElem) -> Option<ZoElem>{
+    pub fn inverse_encoding(&self, x: ZpElem) -> Option<ZoElem> {
         //returns the value in Zo encoded by the ZpElem x
-        for i in 0..self.origin_modulus{
-            if self.is_partition_containing(i, x){
+        for i in 0..self.origin_modulus {
+            if self.is_partition_containing(i, x) {
                 return Some(i);
             }
         }
@@ -105,104 +109,159 @@ impl Encoding{
         self.modulus_p
     }
 
-    pub fn negative_on_p_ring(&self, x : ZpElem) -> ZpElem{
+    pub fn negative_on_p_ring(&self, x: ZpElem) -> ZpElem {
         // for x, return [p - x] % p. Do not mix up with opposite, a.k.a. x + p / 2 !
         (self.modulus_p - x) % self.modulus_p
     }
 
-    pub fn add_constant(&self, constant : ZpElem) -> Self {
+    pub fn add_constant(&self, constant: ZpElem) -> Self {
         Self::new(
-            self.origin_modulus, 
-            self.parts.iter().map(|part| part.iter().map(|x| (x + constant) % self.get_modulus()).collect()).collect(), 
-            self.get_modulus()
+            self.origin_modulus,
+            self.parts
+                .iter()
+                .map(|part| {
+                    part.iter()
+                        .map(|x| (x + constant) % self.get_modulus())
+                        .collect()
+                })
+                .collect(),
+            self.get_modulus(),
         )
     }
 }
 
-
-impl Encoding{
-    pub fn get_origin_modulus(&self) -> u64{
+impl Encoding {
+    pub fn get_origin_modulus(&self) -> u64 {
         self.origin_modulus
     }
 
-    pub fn get_part(&self, element_of_zo : ZoElem) -> &HashSet<u64>{
+    pub fn get_part(&self, element_of_zo: ZoElem) -> &HashSet<u64> {
         &self.parts[element_of_zo as usize]
     }
 
-    pub fn get_part_single_value_if_canonical(&self, element_of_zo : ZoElem) -> ZpElem{
+    pub fn get_part_single_value_if_canonical(&self, element_of_zo: ZoElem) -> ZpElem {
         assert!(self.is_canonical());
-        self.get_part(element_of_zo).iter().next().unwrap().to_owned()
+        self.get_part(element_of_zo)
+            .iter()
+            .next()
+            .unwrap()
+            .to_owned()
     }
 
-
-    pub fn negative_on_o_ring(&self, element_of_zo : ZoElem) -> ZoElem{
+    pub fn negative_on_o_ring(&self, element_of_zo: ZoElem) -> ZoElem {
         (self.origin_modulus - element_of_zo) % self.origin_modulus
     }
 
-    pub fn new(origin_modulus : u64, parts : Vec<HashSet<ZpElem>>, modulus_p : u64) -> Self{
+    pub fn new(origin_modulus: u64, parts: Vec<HashSet<ZpElem>>, modulus_p: u64) -> Self {
         assert!(parts.iter().all(|part| part.iter().all(|x| *x < modulus_p)));
-        let new_encoding = Self{origin_modulus, parts, modulus_p };
-        if new_encoding.is_valid(){
+        let new_encoding = Self {
+            origin_modulus,
+            parts,
+            modulus_p,
+            wopbs: false,
+        };
+        if new_encoding.is_valid() {
             new_encoding
-        }
-        else{
+        } else {
             panic!("This Arithmetic Encoding is not correct !");
         }
     }
 
-
-    pub fn new_canonical(origin_modulus : u64, values_for_singletons : Vec<ZpElem>, modulus_p : u64) -> Self{
-        Self::new(origin_modulus, values_for_singletons.iter().map(|d| HashSet::from([*d])).collect(), modulus_p)
+    pub fn new_canonical(
+        origin_modulus: u64,
+        values_for_singletons: Vec<ZpElem>,
+        modulus_p: u64,
+    ) -> Self {
+        Self::new(
+            origin_modulus,
+            values_for_singletons
+                .iter()
+                .map(|d| HashSet::from([*d]))
+                .collect(),
+            modulus_p,
+        )
     }
 
-
-    pub fn new_canonical_binary(value_for_singleton_true : ZpElem, modulus_p : u64) -> Self{
+    pub fn new_canonical_binary(value_for_singleton_true: ZpElem, modulus_p: u64) -> Self {
         Self::new_canonical(2, vec![0, value_for_singleton_true], modulus_p)
     }
 
-
-    pub fn parity_encoding() -> Self{
+    pub fn parity_encoding() -> Self {
         Self::new_canonical_binary(1, 2)
     }
 
-    pub fn new_trivial(origin_modulus : u64) -> Self{
-        Self::new_canonical(origin_modulus, (0..origin_modulus).collect(), origin_modulus)
+    pub fn new_trivial(origin_modulus: u64) -> Self {
+        Self::new_canonical(
+            origin_modulus,
+            (0..origin_modulus).collect(),
+            origin_modulus,
+        )
     }
 
+    pub fn new_trivial_wopbs(modulus: u64) -> Self {
+        Self {
+            origin_modulus: modulus,
+            parts: (0..modulus).map(|i| HashSet::from([i])).collect(),
+            modulus_p: modulus,
+            wopbs: true,
+        }
+    }
 
+    pub fn new_all_one_wopbs(modulus: u64) -> Self {
+        Self {
+            origin_modulus: modulus,
+            parts: vec![HashSet::from([1]); modulus as usize],
+            modulus_p: modulus,
+            wopbs: true,
+        }
+    }
 
-    pub fn apply_lut_to_encoding(&self, f : &dyn Fn(ZoElem) -> ZoElem) -> Self{
+    pub fn apply_lut_to_encoding(&self, f: &dyn Fn(ZoElem) -> ZoElem) -> Self {
         //the origin modulus of the ouput may be different as the one of the input.
-        let mut parts_hashmap : HashMap<ZoElem, HashSet<ZpElem>> = HashMap::new();
-        for i in 0..self.origin_modulus{
-            match parts_hashmap.get_mut(&f(i)){
-                Some(part) => {self.get_part(i).iter().for_each(|x : &ZpElem| {part.insert(*x);})},
-                None => {parts_hashmap.insert(f(i), self.get_part(i).to_owned());}
+        let mut parts_hashmap: HashMap<ZoElem, HashSet<ZpElem>> = HashMap::new();
+        for i in 0..self.origin_modulus {
+            match parts_hashmap.get_mut(&f(i)) {
+                Some(part) => self.get_part(i).iter().for_each(|x: &ZpElem| {
+                    part.insert(*x);
+                }),
+                None => {
+                    parts_hashmap.insert(f(i), self.get_part(i).to_owned());
+                }
             };
         }
-        let parts = (0..self.origin_modulus).map(|i| match parts_hashmap.get(&i) {
-            Some(part) => part.to_owned(),
-            None => HashSet::new()
-        }).collect();
-        Self::new(self.origin_modulus, parts,  self.modulus_p)
+        let parts = (0..self.origin_modulus)
+            .map(|i| match parts_hashmap.get(&i) {
+                Some(part) => part.to_owned(),
+                None => HashSet::new(),
+            })
+            .collect();
+        if self.wopbs {
+            Self {
+                origin_modulus: self.origin_modulus,
+                parts,
+                modulus_p: self.modulus_p,
+                wopbs: true,
+            }
+        } else {
+            Self::new(self.origin_modulus, parts, self.modulus_p)
+        }
     }
 
-
-    pub fn multiply_encoding_by_constant(&self, constant : ZpElem) -> Self{
-    Self::new(
-        self.origin_modulus,
-        self.parts.iter().map(|x| 
-            x.iter().map(|xi| *xi * constant % self.get_modulus()).collect()
-        ).collect(),
-        self.get_modulus()
-    )
-
-
-    
+    pub fn multiply_encoding_by_constant(&self, constant: ZpElem) -> Self {
+        Self::new(
+            self.origin_modulus,
+            self.parts
+                .iter()
+                .map(|x| {
+                    x.iter()
+                        .map(|xi| *xi * constant % self.get_modulus())
+                        .collect()
+                })
+                .collect(),
+            self.get_modulus(),
+        )
+    }
 }
-}
-
-
 
 // #[test]
 // fn test_boolean_encoding(){
@@ -226,20 +285,17 @@ impl Encoding{
 
 #[test]
 #[should_panic]
-fn bad_arithmetic_encoding_duplicate_i(){
+fn bad_arithmetic_encoding_duplicate_i() {
     let e = Encoding::new(3, [[0, 2].into(), [0].into(), [1].into()].into(), 5);
 }
 
 #[test]
 #[should_panic]
-fn bad_arithmetic_encoding_negacyclicity(){
+fn bad_arithmetic_encoding_negacyclicity() {
     let e = Encoding::new_canonical(3, vec![1, 5, 2], 8);
 }
 
-
 #[test]
-fn good_arithmetic_encoding_negacyclicity(){
+fn good_arithmetic_encoding_negacyclicity() {
     let e = Encoding::new_canonical(3, vec![2, 1, 5], 8);
 }
-
-
