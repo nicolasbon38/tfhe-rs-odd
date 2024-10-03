@@ -104,16 +104,6 @@ impl ClientKey {
     }
 
 
-    ////////debug////////
-    pub fn measure_noise(&self, ct: &Ciphertext) -> i64{
-        GadgetEngine::with_thread_local_mut(|engine| engine.measure_noise(ct, self))
-    }
-
-
-    pub fn test_mvb(&self, ct : &GlweCiphertext<Vec<u64>>){
-        GadgetEngine::with_thread_local_mut(|engine| engine.test_mvb(ct, self))
-    }
-    //////////////////////
 
     /// Allocate and generate a client key.
     ///
