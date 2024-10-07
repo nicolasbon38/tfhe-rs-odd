@@ -66,7 +66,6 @@ pub mod engine;
 pub mod parameters;
 pub mod prelude;
 pub mod server_key;
-pub mod gadget;
 
 /// tool to generate random booleans
 #[cfg(test)]

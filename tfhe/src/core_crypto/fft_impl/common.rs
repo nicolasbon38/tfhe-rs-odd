@@ -32,7 +32,7 @@ pub fn fast_pbs_modulus_switch<Scalar: UnsignedTorus + CastInto<usize>>(
     // First, do the left shift (we discard the offset msb)
     let mut output = input << offset.0;
     // Start doing the right shift
-    output >>= Scalar::BITS - poly_size.log2().0 - 1 + lut_count_log.0;
+    output >>= Scalar::BITS - poly_size.log2().0 - 2 + lut_count_log.0;
     // Do the rounding
     output += Scalar::ONE;
     // Finish the right shift

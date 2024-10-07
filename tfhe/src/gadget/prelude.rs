@@ -8,4 +8,3 @@ pub use super::client_key::ClientKey;
 pub use super::gen_keys;
 pub use super::parameters::*;
 pub use super::server_key::ServerKey;
-pub use super::gadget::Gadget;

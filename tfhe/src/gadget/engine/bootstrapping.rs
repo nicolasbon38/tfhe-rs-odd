@@ -291,32 +291,11 @@ impl Bootstrapper {
             &mut self.encryption_generator,
         );
 
-        let packing_ksk = allocate_and_generate_new_lwe_packing_keyswitch_key(
-            &big_lwe_secret_key, 
-            &cks.glwe_secret_key, 
-            cks.parameters.ks_base_log,
-            cks.parameters.ks_level,
-            cks.parameters.glwe_modular_std_dev,
-            CiphertextModulus::new_native(),
-            &mut self.encryption_generator
-        );
 
-        //Creation of the lwe_key_switching_packing_keys (for tree bootstrapping)
-
-        let relinearization_key = allocate_and_generate_new_relinearization_key(
-            &cks.glwe_secret_key, 
-            cks.parameters.ks_base_log, 
-            cks.parameters.ks_level, 
-            cks.parameters.glwe_modular_std_dev, 
-            CiphertextModulus::new_native(), 
-            &mut self.encryption_generator
-        );
 
         ServerKey {
             bootstrapping_key: fourier_bsk,
             key_switching_key: ksk,
-            lwe_packing_keyswitch_key : packing_ksk,
-            relinearization_key,
             pbs_order: cks.parameters.encryption_key_choice.into(),
         }
     }
@@ -383,117 +362,6 @@ impl Bootstrapper {
             input.ciphertext_modulus(),
         )
     }
-
-
-    //perform the BlindRotation of v0
-    pub fn bootstrap_common_factor(
-        &mut self,
-        input: &LweCiphertextOwned<u64>,
-        enc_out : &Encoding,
-        server_key: &ServerKey
-        ) -> GlweCiphertextOwned<u64> {
-        let BuffersRef {
-            lookup_table:  accumulator,
-            ..
-        } = self.memory.as_buffers_common_factor(server_key, enc_out);
-
-
-        let fourier_bsk = &server_key.bootstrapping_key;
-
-        let fft = Fft::new(fourier_bsk.polynomial_size());
-        let fft = fft.as_view();
-
-        self.computation_buffers.resize(
-            programmable_bootstrap_lwe_ciphertext_mem_optimized_requirement::<u64>(
-                fourier_bsk.glwe_size(),
-                fourier_bsk.polynomial_size(),
-                fft,
-            )
-            .unwrap()
-            .unaligned_bytes_required(),
-        );
-        let stack = self.computation_buffers.stack();
-
-
-        let mut output = GlweCiphertext::new(0u64, accumulator.glwe_size(), accumulator.polynomial_size(), accumulator.ciphertext_modulus());
-
-        programmable_bootstrap_lwe_ciphertext_without_sample_extract_mem_optimized(
-            input,
-            &mut output,
-            &accumulator,
-            fourier_bsk,
-            fft,
-            stack,
-        );
-
-
-        // Self::decrypt_glwe_with_builtin_function(&client_key_debug, &output);
-        // println!("-----------------------");
-
-        GlweCiphertext::from_container(
-            output.as_ref().to_owned(),
-            output.polynomial_size(),
-            input.ciphertext_modulus(),
-        )
-    }
-
-
-    fn create_vi_for_mvb(
-        &mut self, 
-        enc_in : &Encoding,
-        enc_out : &Encoding,
-        server_key: &ServerKey
-    ) -> Polynomial<Vec<u64>>{
-        let mut accumulator_data = Memory::create_accumulator(enc_in, enc_out);
-        let N_poly: usize = server_key.bootstrapping_key.polynomial_size().0;
-
-   
-        let mut accumulator =  Polynomial::new(0u64, PolynomialSize(N_poly));
-
-        let p = enc_in.get_modulus() as usize;
-        let mut new_p = enc_out.get_modulus();
-
-
-        //Here, we perform the division per 2. As for now we use only odd values for p_out, we multiply each accumulator values with the the inverse mod p of 2. Note that if p = 2, other black magic should be performed to get rid of the 2x factor...
-        if new_p % 2 == 1{
-            let inv2 = (new_p + 1) / 2;
-            accumulator_data = accumulator_data.iter().map(|x| x * inv2 % new_p).collect();
-        }
-        // Else, the division per 2 has been carried out in the v0 rotation.
-        else if new_p == 2{
-            new_p = 4;
-        }
-        for i in 0usize..p-1{
-            let diff = (accumulator_data[i+1] as i32 - accumulator_data[i] as i32).rem_euclid(new_p as i32) as u64;
-            accumulator[N_poly / (2 * p) + i * N_poly / p] = diff;
-        }
-        let diff = (new_p as i32 - accumulator_data[0] as i32 - accumulator_data[p-1] as i32).rem_euclid(new_p as i32) as u64;
-        accumulator[N_poly / (2 * p) + (p-1) * N_poly / p] = diff;
-
-        accumulator
-    } 
-
-
-    // Debug
-    // fn decrypt_glwe_with_sample_extraction<OutputCont>(client_key_debug: &ClientKey, glwe_ciphertext : &GlweCiphertext<OutputCont>)
-    // where         OutputCont: Container<Element = u64>,
-    // {
-    //     for i in 0..client_key_debug.parameters.polynomial_size.0{
-    //         let lwe_size = LweSize(client_key_debug.parameters.glwe_dimension.0 * client_key_debug.parameters.polynomial_size.0 + 1);
-    //         let mut output_lwe = LweCiphertext::new(0u64, lwe_size, CiphertextModulus::new_native());
-    //         extract_lwe_sample_from_glwe_ciphertext(&glwe_ciphertext, &mut output_lwe, MonomialDegree(i)); 
-    //         println!("{:032b}", decrypt_lwe_ciphertext(&client_key_debug.glwe_secret_key.as_lwe_secret_key(), &output_lwe).0);
-    //     }
-    // }
-
-
-    // pub fn decrypt_glwe_with_builtin_function<OutputCont>(client_key_debug : &ClientKey, glwe_ciphertext : &GlweCiphertext<OutputCont>) where
-    //     OutputCont: Container<Element = u64>,
-    // {
-    //     let mut plaintext_list = PlaintextList::new(0u64, PlaintextCount(glwe_ciphertext.polynomial_size().0));
-    //     decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_ciphertext, &mut plaintext_list);
-    //     plaintext_list.iter().for_each(|plaintext|println!("{:032b} = {} / {}", plaintext.0, (*plaintext.0 as f64 / (1u64 << 32) as f64 * 5.0).round(), plaintext.0) );
-    // }
 
 
 
