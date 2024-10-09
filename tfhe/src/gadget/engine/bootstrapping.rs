@@ -420,6 +420,7 @@ impl Bootstrapper {
 
 
         let mut output_glwe = GlweCiphertext::new(0u64, accumulator.glwe_size(), accumulator.polynomial_size(), accumulator.ciphertext_modulus());
+
         // programmable_bootstrap_lwe_ciphertext_mem_optimized(
         //     input,
         //     &mut buffer_lwe_after_pbs,
@@ -882,6 +883,8 @@ impl Bootstrapper {
         );
         // let stop_keyswitch = start_keyswitch.elapsed();
         // println!("Durée Keyswitch: {:?}: {:?}", stop_keyswitch.as_millis(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap());
+
+        
 
 
         // let start_bootstrap = Instant::now();
