@@ -278,46 +278,46 @@ impl GadgetEngine {
 ///
 
 impl GadgetEngine {
-    pub fn exec_gadget_with_extraction(
-        &mut self,
-        enc_in: &Vec<Encoding>,
-        enc_inter: &Encoding,
-        enc_out: &Encoding,
-        input: &Vec<Ciphertext>,
-        server_key: &ServerKey,
-    ) -> Ciphertext {
-        let size = match server_key.pbs_order {
-            PBSOrder::KeyswitchBootstrap => server_key
-                .key_switching_key
-                .input_key_lwe_dimension()
-                .to_lwe_size(),
-            PBSOrder::BootstrapKeyswitch => server_key
-                .bootstrapping_key
-                .input_lwe_dimension()
-                .to_lwe_size(),
-        };
+    // pub fn exec_gadget_with_extraction(
+    //     &mut self,
+    //     enc_in: &Vec<Encoding>,
+    //     enc_inter: &Encoding,
+    //     enc_out: &Encoding,
+    //     input: &Vec<Ciphertext>,
+    //     server_key: &ServerKey,
+    // ) -> Ciphertext {
+    //     let size = match server_key.pbs_order {
+    //         PBSOrder::KeyswitchBootstrap => server_key
+    //             .key_switching_key
+    //             .input_key_lwe_dimension()
+    //             .to_lwe_size(),
+    //         PBSOrder::BootstrapKeyswitch => server_key
+    //             .bootstrapping_key
+    //             .input_lwe_dimension()
+    //             .to_lwe_size(),
+    //     };
 
-        let mut buffer_lwe_before_pbs =
-            LweCiphertext::new(0u64, size, CiphertextModulus::new_native());
+    //     let mut buffer_lwe_before_pbs =
+    //         LweCiphertext::new(0u64, size, CiphertextModulus::new_native());
 
-        let bootstrapper = &mut self.bootstrapper;
+    //     let bootstrapper = &mut self.bootstrapper;
 
-        // compute the sum
-        input.iter().enumerate().for_each(|(i, x)| match x {
-            Ciphertext::EncodingEncrypted(x_ct, _) => {
-                lwe_ciphertext_add_assign(&mut buffer_lwe_before_pbs, &x_ct);
-            }
-            Ciphertext::Trivial(x) => panic!("Not yet implemented with trivial ciphertexts"),
-        });
+    //     // compute the sum
+    //     input.iter().enumerate().for_each(|(i, x)| match x {
+    //         Ciphertext::EncodingEncrypted(x_ct, _) => {
+    //             lwe_ciphertext_add_assign(&mut buffer_lwe_before_pbs, &x_ct);
+    //         }
+    //         Ciphertext::Trivial(x) => panic!("Not yet implemented with trivial ciphertexts"),
+    //     });
 
-        // compute the bootstrap and the key switch
-        bootstrapper.apply_bootstrapping_pattern(
-            buffer_lwe_before_pbs,
-            enc_inter,
-            enc_out,
-            server_key,
-        )
-    }
+    //     // compute the bootstrap and the key switch
+    //     bootstrapper.apply_bootstrapping_pattern(
+    //         buffer_lwe_before_pbs,
+    //         enc_inter,
+    //         enc_out,
+    //         server_key,
+    //     )
+    // }
 
     pub fn apply_lut(
         &mut self,
@@ -325,6 +325,7 @@ impl GadgetEngine {
         output_encoding: &Encoding,
         f: &dyn Fn(u64) -> u64,
         server_key: &ServerKey,
+        client_key_debug: &ClientKey
     ) -> Ciphertext {
         match input {
             Ciphertext::EncodingEncrypted(c, enc_in) => {
@@ -335,6 +336,7 @@ impl GadgetEngine {
                     &enc_inter,
                     output_encoding,
                     server_key,
+                    client_key_debug
                 )
             }
             _ => panic!(),
@@ -430,111 +432,111 @@ impl GadgetEngine {
         }
     }
 
-    pub fn simple_tree_bootstrapping(
-        &mut self,
-        common_factor: &GlweCiphertextOwned<u64>,
-        inputs: &Vec<Ciphertext>,
-        encoding_out: &Encoding,
-        t: u64,
-        lut_fi: Vec<u64>,
-        server_key: &ServerKey,
-        client_key_debug: &ClientKey,
-        log: bool,
-    ) -> Ciphertext {
-        let c_0 = inputs[1].clone();
-        match c_0 {
-            Ciphertext::EncodingEncrypted(lwe_c_0, encoding_in_0) => {
-                let bootstrapper = &mut self.bootstrapper;
+    // pub fn simple_tree_bootstrapping(
+    //     &mut self,
+    //     common_factor: &GlweCiphertextOwned<u64>,
+    //     inputs: &Vec<Ciphertext>,
+    //     encoding_out: &Encoding,
+    //     t: u64,
+    //     lut_fi: Vec<u64>,
+    //     server_key: &ServerKey,
+    //     client_key_debug: &ClientKey,
+    //     log: bool,
+    // ) -> Ciphertext {
+    //     let c_0 = inputs[1].clone();
+    //     match c_0 {
+    //         Ciphertext::EncodingEncrypted(lwe_c_0, encoding_in_0) => {
+    //             let bootstrapper = &mut self.bootstrapper;
 
-                let o_0 = encoding_in_0.get_origin_modulus();
+    //             let o_0 = encoding_in_0.get_origin_modulus();
 
-                let first_functions: Vec<Vec<u64>> = (0..t / o_0)
-                    .map(|j: u64| (0..o_0).map(|x| lut_fi[(x + j * o_0) as usize]).collect())
-                    .collect(); // x \in [0, o_0[
+    //             let first_functions: Vec<Vec<u64>> = (0..t / o_0)
+    //                 .map(|j: u64| (0..o_0).map(|x| lut_fi[(x + j * o_0) as usize]).collect())
+    //                 .collect(); // x \in [0, o_0[
 
-                match server_key.pbs_order {
-                    PBSOrder::BootstrapKeyswitch => {
-                        panic!()
-                    }
-                    PBSOrder::KeyswitchBootstrap => {
-                        let lwe_c_0_after_ks = server_key.keyswitch(&lwe_c_0);
-                        if log {
-                            println!(
-                                "TIMING POST_FIRST_KEYSWITCH_TREE ? {:?}",
-                                SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                            );
-                        }
+    //             match server_key.pbs_order {
+    //                 PBSOrder::BootstrapKeyswitch => {
+    //                     panic!()
+    //                 }
+    //                 PBSOrder::KeyswitchBootstrap => {
+    //                     let lwe_c_0_after_ks = server_key.keyswitch(&lwe_c_0);
+    //                     if log {
+    //                         println!(
+    //                             "TIMING POST_FIRST_KEYSWITCH_TREE ? {:?}",
+    //                             SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+    //                         );
+    //                     }
 
-                        let first_ciphertexts = bootstrapper
-                            .mvb_bootstrap_with_common_factor_given(
-                                &common_factor,
-                                lwe_c_0_after_ks,
-                                &encoding_in_0,
-                                &vec![encoding_out.clone(); (t / o_0).try_into().unwrap()],
-                                &first_functions,
-                                &server_key,
-                                &client_key_debug,
-                            );
-                        if log {
-                            println!(
-                                "TIMING POST_MVB_TREE ? {:?}",
-                                SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                            );
-                        }
+    //                     let first_ciphertexts = bootstrapper
+    //                         .mvb_bootstrap_with_common_factor_given(
+    //                             &common_factor,
+    //                             lwe_c_0_after_ks,
+    //                             &encoding_in_0,
+    //                             &vec![encoding_out.clone(); (t / o_0).try_into().unwrap()],
+    //                             &first_functions,
+    //                             &server_key,
+    //                             &client_key_debug,
+    //                         );
+    //                     if log {
+    //                         println!(
+    //                             "TIMING POST_MVB_TREE ? {:?}",
+    //                             SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+    //                         );
+    //                     }
 
-                        let next_accumulator = bootstrapper.pack_into_new_accumulator(
-                            first_ciphertexts,
-                            server_key,
-                            encoding_in_0.get_modulus(),
-                        );
-                        if log {
-                            println!(
-                                "TIMING POST_PACKING_TREE ? {:?}",
-                                SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                            );
-                        }
+    //                     let next_accumulator = bootstrapper.pack_into_new_accumulator(
+    //                         first_ciphertexts,
+    //                         server_key,
+    //                         encoding_in_0.get_modulus(),
+    //                     );
+    //                     if log {
+    //                         println!(
+    //                             "TIMING POST_PACKING_TREE ? {:?}",
+    //                             SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+    //                         );
+    //                     }
 
-                        // Self::decrypt_glwe_with_builtin_function(&client_key_debug, &next_accumulator);
-                        // println!("--------------------------------------");
+    //                     // Self::decrypt_glwe_with_builtin_function(&client_key_debug, &next_accumulator);
+    //                     // println!("--------------------------------------");
 
-                        //for now, only depth-2 trees
+    //                     //for now, only depth-2 trees
 
-                        let c_1 = inputs[0].clone();
-                        match c_1 {
-                            Ciphertext::EncodingEncrypted(lwe_c_1, _) => {
-                                //we assume that they both hve the same input encoding
-                                let lwe_c_1_after_ks = server_key.keyswitch(&lwe_c_1);
-                                if log {
-                                    println!(
-                                        "TIMING POST_SECOND_KEYSWITCH_TREE ? {:?}",
-                                        SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                                    );
-                                }
+    //                     let c_1 = inputs[0].clone();
+    //                     match c_1 {
+    //                         Ciphertext::EncodingEncrypted(lwe_c_1, _) => {
+    //                             //we assume that they both hve the same input encoding
+    //                             let lwe_c_1_after_ks = server_key.keyswitch(&lwe_c_1);
+    //                             if log {
+    //                                 println!(
+    //                                     "TIMING POST_SECOND_KEYSWITCH_TREE ? {:?}",
+    //                                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+    //                                 );
+    //                             }
 
-                                let final_lwe = bootstrapper.bootstrap(
-                                    &lwe_c_1_after_ks,
-                                    &next_accumulator,
-                                    server_key,
-                                );
-                                if log {
-                                    println!(
-                                        "TIMING POST_SIMPLE_BOOTSTRAPPING_IN_TREE ? {:?}",
-                                        SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                                    );
-                                }
+    //                             let final_lwe = bootstrapper.bootstrap(
+    //                                 &lwe_c_1_after_ks,
+    //                                 &next_accumulator,
+    //                                 server_key,
+    //                             );
+    //                             if log {
+    //                                 println!(
+    //                                     "TIMING POST_SIMPLE_BOOTSTRAPPING_IN_TREE ? {:?}",
+    //                                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+    //                                 );
+    //                             }
 
-                                Ciphertext::EncodingEncrypted(final_lwe, encoding_out.clone())
-                            }
-                            _ => panic!(),
-                        }
-                    }
-                }
-            }
-            Ciphertext::Trivial(_) => {
-                panic!()
-            }
-        }
-    }
+    //                             Ciphertext::EncodingEncrypted(final_lwe, encoding_out.clone())
+    //                         }
+    //                         _ => panic!(),
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         Ciphertext::Trivial(_) => {
+    //             panic!()
+    //         }
+    //     }
+    // }
 
     pub fn encoding_switching_mul_constant(
         &mut self,
@@ -697,132 +699,132 @@ impl GadgetEngine {
 
 
 ////Transistor Even
-impl GadgetEngine{
-    // La logique d'encodage n'est pas pertinente aussi, seul compte l'encodage de sortie. On fait juste attention à ce qu'ils aient le même modulo, mais ce n'est pas forcément nécessaire
-    pub fn lwe_mult(&self, lhs: &Ciphertext, rhs: &Ciphertext, output_encoding:&Encoding, server_key: &ServerKey, client_key_debug: &ClientKey) -> Ciphertext {
-        let packing_ksk = &server_key.lwe_packing_keyswitch_key;
-        match (lhs, rhs) {
-            (
-                Ciphertext::EncodingEncrypted(lwe_1, encoding_1),
-                Ciphertext::EncodingEncrypted(lwe_2, encoding_2),
-            ) => {
-                assert_eq!(encoding_1.get_modulus(), encoding_2.get_modulus());
-                let log_p = encoding_1.get_modulus().ilog2();
+// impl GadgetEngine{
+//     // La logique d'encodage n'est pas pertinente aussi, seul compte l'encodage de sortie. On fait juste attention à ce qu'ils aient le même modulo, mais ce n'est pas forcément nécessaire
+//     pub fn lwe_mult(&self, lhs: &Ciphertext, rhs: &Ciphertext, output_encoding:&Encoding, server_key: &ServerKey, client_key_debug: &ClientKey) -> Ciphertext {
+//         let packing_ksk = &server_key.lwe_packing_keyswitch_key;
+//         match (lhs, rhs) {
+//             (
+//                 Ciphertext::EncodingEncrypted(lwe_1, encoding_1),
+//                 Ciphertext::EncodingEncrypted(lwe_2, encoding_2),
+//             ) => {
+//                 assert_eq!(encoding_1.get_modulus(), encoding_2.get_modulus());
+//                 let log_p = encoding_1.get_modulus().ilog2();
 
-                let mut glwe_1 = GlweCiphertext::new(
-                    0u64,
-                    packing_ksk.output_glwe_size(),
-                    packing_ksk.output_polynomial_size(),
-                    packing_ksk.ciphertext_modulus(),
-                );
+//                 let mut glwe_1 = GlweCiphertext::new(
+//                     0u64,
+//                     packing_ksk.output_glwe_size(),
+//                     packing_ksk.output_polynomial_size(),
+//                     packing_ksk.ciphertext_modulus(),
+//                 );
                 
-                keyswitch_lwe_ciphertext_into_glwe_ciphertext(&packing_ksk, lwe_1, &mut glwe_1);
-                /////Debug///////:
-                // let res = decrypt_lwe_ciphertext(&client_key_debug.glwe_secret_key.as_lwe_secret_key(), lwe_1);
-                // println!("LWE 1: {}", res.0);
-                // println!("Polynomial 1:");
-                // let mut plaintext_list = PlaintextList::new(3, PlaintextCount(client_key_debug.parameters.polynomial_size.0));
-                // decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_1, &mut plaintext_list);
-                // plaintext_list.iter().for_each(|plaintext| print!("{}| ", plaintext.0));
-                // println!();
-                //////////////////
-                let mut glwe_2 = GlweCiphertext::new(
-                    0u64,
-                    packing_ksk.output_glwe_size(),
-                    packing_ksk.output_polynomial_size(),
-                    packing_ksk.ciphertext_modulus(),
-                );
+//                 keyswitch_lwe_ciphertext_into_glwe_ciphertext(&packing_ksk, lwe_1, &mut glwe_1);
+//                 /////Debug///////:
+//                 // let res = decrypt_lwe_ciphertext(&client_key_debug.glwe_secret_key.as_lwe_secret_key(), lwe_1);
+//                 // println!("LWE 1: {}", res.0);
+//                 // println!("Polynomial 1:");
+//                 // let mut plaintext_list = PlaintextList::new(3, PlaintextCount(client_key_debug.parameters.polynomial_size.0));
+//                 // decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_1, &mut plaintext_list);
+//                 // plaintext_list.iter().for_each(|plaintext| print!("{}| ", plaintext.0));
+//                 // println!();
+//                 //////////////////
+//                 let mut glwe_2 = GlweCiphertext::new(
+//                     0u64,
+//                     packing_ksk.output_glwe_size(),
+//                     packing_ksk.output_polynomial_size(),
+//                     packing_ksk.ciphertext_modulus(),
+//                 );
 
-                keyswitch_lwe_ciphertext_into_glwe_ciphertext(&packing_ksk, lwe_2, &mut glwe_2);
-                /////Debug///////:
-                // let res = decrypt_lwe_ciphertext(&client_key_debug.glwe_secret_key.as_lwe_secret_key(), lwe_2);
-                // println!("LWE 2: {}", res.0);
-                // println!("Polynomial 2:");
-                // let mut plaintext_list = PlaintextList::new(3, PlaintextCount(client_key_debug.parameters.polynomial_size.0));
-                // decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_2, &mut plaintext_list);
-                // plaintext_list.iter().for_each(|plaintext| print!("{}| ", plaintext.0));
-                // println!();
-                //////////////////
-                let start = Instant::now();
-                let glwe_res = glwe_mult(&glwe_1, &glwe_2, &server_key.relinearization_key, log_p.try_into().unwrap(), &client_key_debug.glwe_secret_key);
-                let stop = start.elapsed();
-                println!("GLWE mult internal:{:?}", stop);
-                /////Debug///////:
-                // println!("result:");
-                // let mut plaintext_list = PlaintextList::new(3, PlaintextCount(client_key_debug.parameters.polynomial_size.0));
-                // decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_res, &mut plaintext_list);
-                // plaintext_list.iter().for_each(|plaintext| print!("{}| ", plaintext.0));
-                //////////////////
-                let mut output_lwe = LweCiphertext::new(
-                    0u64,
-                    server_key
-                        .lwe_packing_keyswitch_key
-                        .input_key_lwe_dimension()
-                        .to_lwe_size(),
-                    CiphertextModulus::new_native(),
-                );
+//                 keyswitch_lwe_ciphertext_into_glwe_ciphertext(&packing_ksk, lwe_2, &mut glwe_2);
+//                 /////Debug///////:
+//                 // let res = decrypt_lwe_ciphertext(&client_key_debug.glwe_secret_key.as_lwe_secret_key(), lwe_2);
+//                 // println!("LWE 2: {}", res.0);
+//                 // println!("Polynomial 2:");
+//                 // let mut plaintext_list = PlaintextList::new(3, PlaintextCount(client_key_debug.parameters.polynomial_size.0));
+//                 // decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_2, &mut plaintext_list);
+//                 // plaintext_list.iter().for_each(|plaintext| print!("{}| ", plaintext.0));
+//                 // println!();
+//                 //////////////////
+//                 let start = Instant::now();
+//                 let glwe_res = glwe_mult(&glwe_1, &glwe_2, &server_key.relinearization_key, log_p.try_into().unwrap(), &client_key_debug.glwe_secret_key);
+//                 let stop = start.elapsed();
+//                 println!("GLWE mult internal:{:?}", stop);
+//                 /////Debug///////:
+//                 // println!("result:");
+//                 // let mut plaintext_list = PlaintextList::new(3, PlaintextCount(client_key_debug.parameters.polynomial_size.0));
+//                 // decrypt_glwe_ciphertext(&client_key_debug.glwe_secret_key, &glwe_res, &mut plaintext_list);
+//                 // plaintext_list.iter().for_each(|plaintext| print!("{}| ", plaintext.0));
+//                 //////////////////
+//                 let mut output_lwe = LweCiphertext::new(
+//                     0u64,
+//                     server_key
+//                         .lwe_packing_keyswitch_key
+//                         .input_key_lwe_dimension()
+//                         .to_lwe_size(),
+//                     CiphertextModulus::new_native(),
+//                 );
 
-                extract_lwe_sample_from_glwe_ciphertext(&glwe_res, &mut output_lwe, MonomialDegree(0));
-                /////////:Debug
-                // let res = decrypt_lwe_ciphertext(&client_key_debug.glwe_secret_key.as_lwe_secret_key(), &output_lwe);
-                // println!("final_result: {}", res.0);
-                Ciphertext::EncodingEncrypted(output_lwe, output_encoding.clone())
-            }
-            _ => panic!("Calling LweMult with trivial ciphertexts"),
-        }
-    }
+//                 extract_lwe_sample_from_glwe_ciphertext(&glwe_res, &mut output_lwe, MonomialDegree(0));
+//                 /////////:Debug
+//                 // let res = decrypt_lwe_ciphertext(&client_key_debug.glwe_secret_key.as_lwe_secret_key(), &output_lwe);
+//                 // println!("final_result: {}", res.0);
+//                 Ciphertext::EncodingEncrypted(output_lwe, output_encoding.clone())
+//             }
+//             _ => panic!("Calling LweMult with trivial ciphertexts"),
+//         }
+//     }
 
 
 
-    pub fn woppbs_lut(&mut self, input : &Ciphertext, encoding_out : &Encoding, sk : &ServerKey, f : &dyn Fn(u64) -> u64, client_key_debug: &ClientKey) -> Ciphertext {
-        match input {
-            Ciphertext::EncodingEncrypted(c, enc_in) => {
-                let bootstrapper = &mut self.bootstrapper;
-                let enc_inter = enc_in.apply_lut_to_encoding(f);
+    // pub fn woppbs_lut(&mut self, input : &Ciphertext, encoding_out : &Encoding, sk : &ServerKey, f : &dyn Fn(u64) -> u64, client_key_debug: &ClientKey) -> Ciphertext {
+    //     match input {
+    //         Ciphertext::EncodingEncrypted(c, enc_in) => {
+    //             let bootstrapper = &mut self.bootstrapper;
+    //             let enc_inter = enc_in.apply_lut_to_encoding(f);
                 
-                let start = Instant::now();
-                let ct_f = bootstrapper.apply_bootstrapping_pattern(
-                    c.clone(),
-                    &enc_inter,
-                    &encoding_out,
-                    &sk,
-                );
-                let stop = start.elapsed();
-                println!("First pbs:{:?}", stop);
+    //             let start = Instant::now();
+    //             let ct_f = bootstrapper.apply_bootstrapping_pattern(
+    //                 c.clone(),
+    //                 &enc_inter,
+    //                 &encoding_out,
+    //                 &sk,
+    //             );
+    //             let stop = start.elapsed();
+    //             println!("First pbs:{:?}", stop);
 
-                let enc_ones = Encoding::new_all_one_wopbs(enc_in.get_origin_modulus());
-                let start = Instant::now();
-                let ct_ones = bootstrapper.apply_bootstrapping_pattern(
-                    c.clone(),
-                    &enc_in,
-                    &enc_ones,
-                    &sk,
-                ); 
-                let stop = start.elapsed();
-                println!("Second pbs:{:?}", stop);
+    //             let enc_ones = Encoding::new_all_one_wopbs(enc_in.get_origin_modulus());
+    //             let start = Instant::now();
+    //             let ct_ones = bootstrapper.apply_bootstrapping_pattern(
+    //                 c.clone(),
+    //                 &enc_in,
+    //                 &enc_ones,
+    //                 &sk,
+    //             ); 
+    //             let stop = start.elapsed();
+    //             println!("Second pbs:{:?}", stop);
 
-                // let c_input_debug = self.decrypt(&input, &client_key_debug);
-                // println!("res_input_debug={}", c_input_debug);
+    //             // let c_input_debug = self.decrypt(&input, &client_key_debug);
+    //             // println!("res_input_debug={}", c_input_debug);
 
-                // let res_f_debug = self.decrypt(&ct_f, &client_key_debug);
-                // println!("res_f_debug={}", res_f_debug);
+    //             // let res_f_debug = self.decrypt(&ct_f, &client_key_debug);
+    //             // println!("res_f_debug={}", res_f_debug);
 
 
-                // let res_ones_debug = self.decrypt(&ct_ones, &client_key_debug);
-                // println!("res_ones_debug={}", res_ones_debug);
-                let start = Instant::now();
-                let result = self.lwe_mult(&ct_f, &ct_ones, encoding_out,sk,&client_key_debug);
-                let stop = start.elapsed();
-                println!("Mult:{:?}", stop);
+    //             // let res_ones_debug = self.decrypt(&ct_ones, &client_key_debug);
+    //             // println!("res_ones_debug={}", res_ones_debug);
+    //             let start = Instant::now();
+    //             let result = self.lwe_mult(&ct_f, &ct_ones, encoding_out,sk,&client_key_debug);
+    //             let stop = start.elapsed();
+    //             println!("Mult:{:?}", stop);
 
-                // println!("noise after mult:{}", self.measure_noise(&result, &client_key_debug));
-                result
+    //             // println!("noise after mult:{}", self.measure_noise(&result, &client_key_debug));
+    //             result
                 
-            }
-            _ => panic!(),
-        }
-    }
-}
+    //         }
+    //         _ => panic!(),
+    //     }
+    // }
+// }
 
 //////////
 

@@ -22,17 +22,17 @@ use super::client_key;
 
 
 impl ServerKey {
-    ////Boolean only : gadget logic (see paper)//////
-    pub fn exec_gadget_with_extraction(&self, enc_in : &Vec<Encoding>, enc_inter : &Encoding, enc_out : &Encoding, input : &Vec<Ciphertext>) -> Ciphertext{
-        GadgetEngine::with_thread_local_mut(|engine| engine.exec_gadget_with_extraction(enc_in, enc_inter, enc_out, input, &self))
-    }
-    //////////////////////////////////////////////////
+    // ////Boolean only : gadget logic (see paper)//////
+    // pub fn exec_gadget_with_extraction(&self, enc_in : &Vec<Encoding>, enc_inter : &Encoding, enc_out : &Encoding, input : &Vec<Ciphertext>) -> Ciphertext{
+    //     GadgetEngine::with_thread_local_mut(|engine| engine.exec_gadget_with_extraction(enc_in, enc_inter, enc_out, input, &self))
+    // }
+    // //////////////////////////////////////////////////
     
 
 
     ///Arithmetic only : application of LUT from Zo to Zo
-    pub fn apply_lut(&self, input : &Ciphertext, encoding_out : &Encoding, f : &dyn Fn(u64) -> u64) -> Ciphertext{
-        GadgetEngine::with_thread_local_mut(|engine| engine.apply_lut(input, encoding_out, f, self))
+    pub fn apply_lut(&self, input : &Ciphertext, encoding_out : &Encoding, f : &dyn Fn(u64) -> u64, client_key_debug: &ClientKey) -> Ciphertext{
+        GadgetEngine::with_thread_local_mut(|engine| engine.apply_lut(input, encoding_out, f, self, client_key_debug))
     }
     ///////////////////////////////////////////////////
     
@@ -52,51 +52,51 @@ impl ServerKey {
         }
     }
 
-    pub fn full_tree_bootstrapping(
-        &self,
-        inputs: &Vec<Ciphertext>,
-        encodings_out: &Vec<Encoding>,
-        t: u64,
-        f: &dyn Fn(u64) -> u64,
-        client_key_debug: &ClientKey,
-        log : bool
-    ) -> Vec<Ciphertext> {
-        let origin_submodulis: Vec<u64> = inputs
-            .iter()
-            .map(|c| match c {
-                Ciphertext::EncodingEncrypted(_, encoding) => encoding.get_origin_modulus(),
-                Ciphertext::Trivial(_) => panic!("No tree bootstrapping with trivial ciphertexts (yet)"),
-            })
-            .collect();
+    // pub fn full_tree_bootstrapping(
+    //     &self,
+    //     inputs: &Vec<Ciphertext>,
+    //     encodings_out: &Vec<Encoding>,
+    //     t: u64,
+    //     f: &dyn Fn(u64) -> u64,
+    //     client_key_debug: &ClientKey,
+    //     log : bool
+    // ) -> Vec<Ciphertext> {
+    //     let origin_submodulis: Vec<u64> = inputs
+    //         .iter()
+    //         .map(|c| match c {
+    //             Ciphertext::EncodingEncrypted(_, encoding) => encoding.get_origin_modulus(),
+    //             Ciphertext::Trivial(_) => panic!("No tree bootstrapping with trivial ciphertexts (yet)"),
+    //         })
+    //         .collect();
     
-        assert_eq!(origin_submodulis.iter().product::<u64>(), t);
+    //     assert_eq!(origin_submodulis.iter().product::<u64>(), t);
     
-        let o = origin_submodulis[0];
-        let lut_f0 = (0..t).map(|x| f(x) % o).collect_vec();
-        let lut_f1 = (0..t).map(|x: u64| (f(x) - f(x) % o) / o).collect_vec();
+    //     let o = origin_submodulis[0];
+    //     let lut_f0 = (0..t).map(|x| f(x) % o).collect_vec();
+    //     let lut_f1 = (0..t).map(|x: u64| (f(x) - f(x) % o) / o).collect_vec();
 
 
-        let common_factor = GadgetEngine::with_thread_local_mut(|engine|{
-            engine.compute_common_factor(&inputs[1], &encodings_out[0], &self)
-        });
+    //     let common_factor = GadgetEngine::with_thread_local_mut(|engine|{
+    //         engine.compute_common_factor(&inputs[1], &encodings_out[0], &self)
+    //     });
 
-        let r0 = GadgetEngine::with_thread_local_mut(|engine| {
-            engine.simple_tree_bootstrapping(&common_factor.clone(), inputs, &encodings_out[0], t, lut_f0, &self, client_key_debug, log)
-        });
+    //     let r0 = GadgetEngine::with_thread_local_mut(|engine| {
+    //         engine.simple_tree_bootstrapping(&common_factor.clone(), inputs, &encodings_out[0], t, lut_f0, &self, client_key_debug, log)
+    //     });
     
-        let r1 = GadgetEngine::with_thread_local_mut(|engine| {
-            engine.simple_tree_bootstrapping(&common_factor.clone(), inputs, &encodings_out[1], t, lut_f1, &self, client_key_debug, false)
-        });
+    //     let r1 = GadgetEngine::with_thread_local_mut(|engine| {
+    //         engine.simple_tree_bootstrapping(&common_factor.clone(), inputs, &encodings_out[1], t, lut_f1, &self, client_key_debug, false)
+    //     });
     
-        vec![r1, r0]
-    }
+    //     vec![r1, r0]
+    // }
     
      
     
-    ///Encoding Switching : universal
-    pub fn encoding_switching_lut(&self, input : &Ciphertext, encoding_out : &Encoding) -> Ciphertext{
-        GadgetEngine::with_thread_local_mut(|engine| engine.apply_lut(input, encoding_out, &|x|{x}, self))
-    }
+    // ///Encoding Switching : universal
+    // pub fn encoding_switching_lut(&self, input : &Ciphertext, encoding_out : &Encoding) -> Ciphertext{
+    //     GadgetEngine::with_thread_local_mut(|engine| engine.apply_lut(input, encoding_out, &|x|{x}, self))
+    // }
 
     //transforme un encodage en un autre avec un external product par un coefficient donné
     pub fn encoding_switching_mul_constant(&self, input : &Ciphertext, coefficient : u64) -> Ciphertext{
@@ -139,15 +139,15 @@ impl ServerKey {
 
 
 ///Research ofor even transistor
-impl ServerKey{
-    pub fn lwe_mult(&self, lhs:&Ciphertext, rhs: &Ciphertext, output_encoding : &Encoding, client_key_debug:&ClientKey) -> Ciphertext{
-        GadgetEngine::with_thread_local_mut(|engine| engine.lwe_mult(&lhs, &rhs, output_encoding, &self, &client_key_debug))
-    }
+// impl ServerKey{
+//     pub fn lwe_mult(&self, lhs:&Ciphertext, rhs: &Ciphertext, output_encoding : &Encoding, client_key_debug:&ClientKey) -> Ciphertext{
+//         GadgetEngine::with_thread_local_mut(|engine| engine.lwe_mult(&lhs, &rhs, output_encoding, &self, &client_key_debug))
+//     }
 
-    pub fn woppbs_lut(&self, input : &Ciphertext, encoding_out : &Encoding, f : &dyn Fn(u64) -> u64, client_key_debug:&ClientKey) -> Ciphertext{
-        GadgetEngine::with_thread_local_mut(|engine| engine.woppbs_lut(&input, &encoding_out, &self, f,&client_key_debug))
-    }
-}
+//     pub fn woppbs_lut(&self, input : &Ciphertext, encoding_out : &Encoding, f : &dyn Fn(u64) -> u64, client_key_debug:&ClientKey) -> Ciphertext{
+//         GadgetEngine::with_thread_local_mut(|engine| engine.woppbs_lut(&input, &encoding_out, &self, f,&client_key_debug))
+//     }
+// }
 
 
 

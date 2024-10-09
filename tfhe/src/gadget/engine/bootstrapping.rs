@@ -4,6 +4,7 @@
 use crate::core_crypto::prelude::{CiphertextModulus, Container, ContiguousEntityContainer, ContiguousEntityContainerMut, Fft, MonomialDegree, PBSOrder, PlaintextCount};
 use crate::gadget::engine::polynomial_algorithms::polynomial_wrapping_monic_monomial_mul_assign;
 use crate::gadget::engine::slice_algorithms::slice_wrapping_add_assign;
+use crate::gadget::engine::{GadgetEngine, WithThreadLocalEngine};
 use crate::gadget::prelude::*;
 use crate::core_crypto::algorithms::*;
 use crate::core_crypto::commons::computation_buffers::ComputationBuffers;
@@ -253,8 +254,8 @@ impl Memory {
 pub struct ServerKey {
     pub(crate) bootstrapping_key: FourierLweBootstrapKeyOwned,
     pub(crate) key_switching_key: LweKeyswitchKeyOwned<u64>,
-    pub(crate) lwe_packing_keyswitch_key : LwePackingKeyswitchKeyOwned<u64>,
-    pub(crate) relinearization_key: RelinearizationKey<Vec<u64>>,
+    // pub(crate) lwe_packing_keyswitch_key : LwePackingKeyswitchKeyOwned<u64>,
+    // pub(crate) relinearization_key: RelinearizationKey<Vec<u64>>,
     pub(crate) pbs_order: PBSOrder
 }
 
@@ -352,32 +353,32 @@ impl Bootstrapper {
             &mut self.encryption_generator,
         );
 
-        let packing_ksk = allocate_and_generate_new_lwe_packing_keyswitch_key(
-            &big_lwe_secret_key, 
-            &cks.glwe_secret_key, 
-            cks.parameters.ks_base_log,
-            cks.parameters.ks_level,
-            cks.parameters.glwe_modular_std_dev,
-            CiphertextModulus::new_native(),
-            &mut self.encryption_generator
-        );
+        // let packing_ksk = allocate_and_generate_new_lwe_packing_keyswitch_key(
+        //     &big_lwe_secret_key, 
+        //     &cks.glwe_secret_key, 
+        //     cks.parameters.ks_base_log,
+        //     cks.parameters.ks_level,
+        //     cks.parameters.glwe_modular_std_dev,
+        //     CiphertextModulus::new_native(),
+        //     &mut self.encryption_generator
+        // );
 
-        //Creation of the lwe_key_switching_packing_keys (for tree bootstrapping)
+        // //Creation of the lwe_key_switching_packing_keys (for tree bootstrapping)
 
-        let relinearization_key = allocate_and_generate_new_relinearization_key(
-            &cks.glwe_secret_key, 
-            cks.parameters.ks_base_log, 
-            cks.parameters.ks_level, 
-            cks.parameters.glwe_modular_std_dev, 
-            CiphertextModulus::new_native(), 
-            &mut self.encryption_generator
-        );
+        // let relinearization_key = allocate_and_generate_new_relinearization_key(
+        //     &cks.glwe_secret_key, 
+        //     cks.parameters.ks_base_log, 
+        //     cks.parameters.ks_level, 
+        //     cks.parameters.glwe_modular_std_dev, 
+        //     CiphertextModulus::new_native(), 
+        //     &mut self.encryption_generator
+        // );
 
         ServerKey {
             bootstrapping_key: fourier_bsk,
             key_switching_key: ksk,
-            lwe_packing_keyswitch_key : packing_ksk,
-            relinearization_key,
+            // lwe_packing_keyswitch_key : packing_ksk,
+            // relinearization_key,
             pbs_order: cks.parameters.encryption_key_choice.into(),
         }
     }
@@ -682,115 +683,115 @@ impl Bootstrapper {
     }
 
 
-    pub(crate) fn pack_into_new_accumulator(
-        &self, 
-        lwe_ciphertexts : Vec<LweCiphertextOwned<u64>>,
-        server_key : &ServerKey,
-        p : u64,
-    ) -> GlweCiphertext<Vec<u64>>{
-        let mut output_glwe_ciphertext = GlweCiphertext::new(0u64, server_key.bootstrapping_key.glwe_size(), server_key.bootstrapping_key.polynomial_size(), CiphertextModulus::new_native());
+    // pub(crate) fn pack_into_new_accumulator(
+    //     &self, 
+    //     lwe_ciphertexts : Vec<LweCiphertextOwned<u64>>,
+    //     server_key : &ServerKey,
+    //     p : u64,
+    // ) -> GlweCiphertext<Vec<u64>>{
+    //     let mut output_glwe_ciphertext = GlweCiphertext::new(0u64, server_key.bootstrapping_key.glwe_size(), server_key.bootstrapping_key.polynomial_size(), CiphertextModulus::new_native());
 
-        //reordering accumulator
-        let accumulator_elements : Vec<_> = (0..p).map(|k|{
-            if k % 2 == 0{ 
-                match lwe_ciphertexts.get(k as usize/2){
-                    Some(c) => c.clone(),
-                    None => LweCiphertext::new(0u64, lwe_ciphertexts[0].lwe_size(), CiphertextModulus::new_native())
-            }}
-            else{
-                match lwe_ciphertexts.get(((p+1)/2 + (k-1)/2) as usize){
-                    Some(c) => {
-                        let mut c_clone = c.clone();
-                        lwe_ciphertext_opposite_assign(&mut c_clone);
-                        c_clone
-                    },
-                    None => LweCiphertext::new(0u64, lwe_ciphertexts[0].lwe_size(), CiphertextModulus::new_native())
-                }
-            }
-        }).collect();
-
-
-        assert!(p % 2 == 1, "Pas sûr que ça marche avec une output paire");
-        let N = server_key.bootstrapping_key.polynomial_size().0;
-        let size_slice = N / p as usize;
+    //     //reordering accumulator
+    //     let accumulator_elements : Vec<_> = (0..p).map(|k|{
+    //         if k % 2 == 0{ 
+    //             match lwe_ciphertexts.get(k as usize/2){
+    //                 Some(c) => c.clone(),
+    //                 None => LweCiphertext::new(0u64, lwe_ciphertexts[0].lwe_size(), CiphertextModulus::new_native())
+    //         }}
+    //         else{
+    //             match lwe_ciphertexts.get(((p+1)/2 + (k-1)/2) as usize){
+    //                 Some(c) => {
+    //                     let mut c_clone = c.clone();
+    //                     lwe_ciphertext_opposite_assign(&mut c_clone);
+    //                     c_clone
+    //                 },
+    //                 None => LweCiphertext::new(0u64, lwe_ciphertexts[0].lwe_size(), CiphertextModulus::new_native())
+    //             }
+    //         }
+    //     }).collect();
 
 
-
-        if p % 2 == 1{
-
-            let mut buffer = GlweCiphertext::new(
-                0u64,
-                output_glwe_ciphertext.glwe_size(),
-                output_glwe_ciphertext.polynomial_size(),
-                output_glwe_ciphertext.ciphertext_modulus(),
-            );
+    //     assert!(p % 2 == 1, "Pas sûr que ça marche avec une output paire");
+    //     let N = server_key.bootstrapping_key.polynomial_size().0;
+    //     let size_slice = N / p as usize;
 
 
 
-            //index \in [0, p-2]
-            for (k, elmt) in accumulator_elements.iter().enumerate(){
-                keyswitch_lwe_ciphertext_into_glwe_ciphertext(&server_key.lwe_packing_keyswitch_key, &elmt, &mut buffer);
+    //     if p % 2 == 1{
+
+    //         let mut buffer = GlweCiphertext::new(
+    //             0u64,
+    //             output_glwe_ciphertext.glwe_size(),
+    //             output_glwe_ciphertext.polynomial_size(),
+    //             output_glwe_ciphertext.ciphertext_modulus(),
+    //         );
+
+
+
+    //         //index \in [0, p-2]
+    //         for (k, elmt) in accumulator_elements.iter().enumerate(){
+    //             keyswitch_lwe_ciphertext_into_glwe_ciphertext(&server_key.lwe_packing_keyswitch_key, &elmt, &mut buffer);
                 
-                let number_of_repetition = if k == 0 {size_slice/2} else {size_slice};
-                (0..number_of_repetition).for_each(|i|{
-                    let mut buffer_bis = buffer.clone();
-                    buffer_bis.
-                        as_mut_polynomial_list()
-                        .iter_mut()
-                        .for_each(|mut poly| {
-                            let offset = if k == 0 {0} else {size_slice / 2 + (k - 1) * size_slice};
-                            polynomial_wrapping_monic_monomial_mul_assign(&mut poly, MonomialDegree(offset  + i));
-                        });
-                    slice_wrapping_add_assign(output_glwe_ciphertext.as_mut(), buffer_bis.as_ref());
-                });
-            }
+    //             let number_of_repetition = if k == 0 {size_slice/2} else {size_slice};
+    //             (0..number_of_repetition).for_each(|i|{
+    //                 let mut buffer_bis = buffer.clone();
+    //                 buffer_bis.
+    //                     as_mut_polynomial_list()
+    //                     .iter_mut()
+    //                     .for_each(|mut poly| {
+    //                         let offset = if k == 0 {0} else {size_slice / 2 + (k - 1) * size_slice};
+    //                         polynomial_wrapping_monic_monomial_mul_assign(&mut poly, MonomialDegree(offset  + i));
+    //                     });
+    //                 slice_wrapping_add_assign(output_glwe_ciphertext.as_mut(), buffer_bis.as_ref());
+    //             });
+    //         }
 
-            // index = p-1 (last one)
-            keyswitch_lwe_ciphertext_into_glwe_ciphertext(&server_key.lwe_packing_keyswitch_key, &accumulator_elements[0], &mut buffer);
-                glwe_ciphertext_opposite_assign(&mut buffer);
-                (0..size_slice/2).for_each(|i|{
-                    let mut buffer_bis = buffer.clone();
-                    buffer_bis.
-                        as_mut_polynomial_list()
-                        .iter_mut()
-                        .for_each(|mut poly| {
-                            polynomial_wrapping_monic_monomial_mul_assign(&mut poly, MonomialDegree(N - size_slice / 2 + i));
-                        });
-                    slice_wrapping_add_assign(output_glwe_ciphertext.as_mut(), buffer_bis.as_ref());
-                })
+    //         // index = p-1 (last one)
+    //         keyswitch_lwe_ciphertext_into_glwe_ciphertext(&server_key.lwe_packing_keyswitch_key, &accumulator_elements[0], &mut buffer);
+    //             glwe_ciphertext_opposite_assign(&mut buffer);
+    //             (0..size_slice/2).for_each(|i|{
+    //                 let mut buffer_bis = buffer.clone();
+    //                 buffer_bis.
+    //                     as_mut_polynomial_list()
+    //                     .iter_mut()
+    //                     .for_each(|mut poly| {
+    //                         polynomial_wrapping_monic_monomial_mul_assign(&mut poly, MonomialDegree(N - size_slice / 2 + i));
+    //                     });
+    //                 slice_wrapping_add_assign(output_glwe_ciphertext.as_mut(), buffer_bis.as_ref());
+    //             })
     
 
-        }
+    //     }
 
 
 
-        // if p % 2 == 1{
-        //     (0..size_slice/2).for_each(|_| container_for_lwe_ciphertext_list.push(accumulator_elements[0].clone().into_container()));
-        //     for k in 1..p{
-        //         (0..size_slice).for_each(|_| container_for_lwe_ciphertext_list.push(accumulator_elements[k as usize].clone().into_container()))
-        //     }
-        //     let mut last_coeff = accumulator_elements[0].clone();
-        //     lwe_ciphertext_opposite_assign(&mut last_coeff);
-        //     (0..size_slice/2).for_each(|_| container_for_lwe_ciphertext_list.push(last_coeff.clone().into_container()));
-        // // }
+    //     // if p % 2 == 1{
+    //     //     (0..size_slice/2).for_each(|_| container_for_lwe_ciphertext_list.push(accumulator_elements[0].clone().into_container()));
+    //     //     for k in 1..p{
+    //     //         (0..size_slice).for_each(|_| container_for_lwe_ciphertext_list.push(accumulator_elements[k as usize].clone().into_container()))
+    //     //     }
+    //     //     let mut last_coeff = accumulator_elements[0].clone();
+    //     //     lwe_ciphertext_opposite_assign(&mut last_coeff);
+    //     //     (0..size_slice/2).for_each(|_| container_for_lwe_ciphertext_list.push(last_coeff.clone().into_container()));
+    //     // // }
 
-        // let input_lwe_ciphertexts = LweCiphertextList::from_container(
-        //     container_for_lwe_ciphertext_list.concat(), 
-        //     server_key.bootstrapping_key.output_lwe_dimension().to_lwe_size(), 
-        //     CiphertextModulus::new_native()
-        // );           
-
-
-        // keyswitch_lwe_ciphertext_list_and_pack_in_glwe_ciphertext(
-        //     &server_key.lwe_packing_keyswitch_key,
-        //     &input_lwe_ciphertexts, 
-        //     &mut output_glwe_ciphertext
-        // );
-
-        output_glwe_ciphertext
+    //     // let input_lwe_ciphertexts = LweCiphertextList::from_container(
+    //     //     container_for_lwe_ciphertext_list.concat(), 
+    //     //     server_key.bootstrapping_key.output_lwe_dimension().to_lwe_size(), 
+    //     //     CiphertextModulus::new_native()
+    //     // );           
 
 
-    }
+    //     // keyswitch_lwe_ciphertext_list_and_pack_in_glwe_ciphertext(
+    //     //     &server_key.lwe_packing_keyswitch_key,
+    //     //     &input_lwe_ciphertexts, 
+    //     //     &mut output_glwe_ciphertext
+    //     // );
+
+    //     output_glwe_ciphertext
+
+
+    // }
 
 
     pub(crate) fn bootstrap_keyswitch(
@@ -851,6 +852,7 @@ impl Bootstrapper {
             enc_inter : &Encoding,
             enc_out : &Encoding,
             server_key: &ServerKey,
+            client_key_debug : &ClientKey
     ) -> Ciphertext {
         let BuffersRef {
             lookup_table,
@@ -883,8 +885,8 @@ impl Bootstrapper {
         );
         // let stop_keyswitch = start_keyswitch.elapsed();
         // println!("Durée Keyswitch: {:?}: {:?}", stop_keyswitch.as_millis(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap());
-
-        
+        let plain = decrypt_lwe_ciphertext(&client_key_debug.lwe_secret_key, &buffer_lwe_after_ks);
+        println!("Decrypted = {}", plain.0);
 
 
         // let start_bootstrap = Instant::now();
@@ -910,10 +912,11 @@ impl Bootstrapper {
         enc_inter : &Encoding,
         enc_out : &Encoding,
         server_key: &ServerKey,
+        client_key_debug : &ClientKey
     ) -> Ciphertext {
         match server_key.pbs_order {
-            PBSOrder::KeyswitchBootstrap => self.keyswitch_bootstrap(ct, enc_inter, enc_out, server_key),
-            PBSOrder::BootstrapKeyswitch => self.bootstrap_keyswitch(ct, enc_inter, enc_out, server_key),
+            PBSOrder::KeyswitchBootstrap => self.keyswitch_bootstrap(ct, enc_inter, enc_out, server_key, client_key_debug),
+            PBSOrder::BootstrapKeyswitch => panic!()
         }
     }
 }
