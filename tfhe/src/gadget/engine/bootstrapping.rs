@@ -884,7 +884,7 @@ impl Bootstrapper {
         // let stop_keyswitch = start_keyswitch.elapsed();
         // println!("Durée Keyswitch: {:?}: {:?}", stop_keyswitch.as_millis(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap());
 
-        
+        SerializableCiphertext::from_lwe_ciphertext(&buffer_lwe_after_ks, enc_inter.get_modulus(), 64);
 
 
         // let start_bootstrap = Instant::now();

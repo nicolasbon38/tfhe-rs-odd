@@ -3,7 +3,13 @@
 //! This module implements the ciphertext structure containing an encryption of a Boolean message.
 
 use crate::core_crypto::entities::*;
+use crate::core_crypto::prelude::{Container, UnsignedInteger};
 use std::collections::{HashMap, HashSet};
+
+use rmp_serde::{decode, encode};
+use serde::{Deserialize, Serialize};
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufReader, BufWriter, Write};
 
 #[derive(Clone, Debug)]
 pub enum Ciphertext {
@@ -260,6 +266,62 @@ impl Encoding {
                 .collect(),
             self.get_modulus(),
         )
+    }
+}
+
+// Define your struct with Serialize and Deserialize traits
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SerializableCiphertext {
+    values: Vec<u64>, // The lwe coefficients
+    expected_msg: i64,
+    modulus: u64,
+    log_ciphertext_modulus: u64
+}
+
+impl SerializableCiphertext {
+    // Function to save to a file
+    pub fn append_to_file(&self, filename: &str) -> io::Result<()> {
+        let file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(filename)?;
+        let mut writer = BufWriter::new(file);
+        encode::write(&mut writer, &self).unwrap();
+        writer.flush()?;
+        Ok(())
+    }
+
+    pub fn from_ciphertext(c: &Ciphertext, expected_msg: i64) -> Self {
+        match c {
+            Ciphertext::EncodingEncrypted(lwe, encoding) => {
+                let values = lwe.clone().into_container();
+                Self {
+                    values,
+                    expected_msg,
+                    modulus: encoding.get_modulus(),
+                    log_ciphertext_modulus: 64
+                }
+            }
+            Ciphertext::Trivial(_) => {
+                panic!()
+            }
+        }
+    }
+
+    pub fn from_lwe_ciphertext<InputCont>(
+        c: &LweCiphertext<InputCont>,
+        modulus: u64,
+        log_ciphertext_modulus: u64
+    ) -> Self
+    where
+        InputCont: Container<Element = u64>,
+    {
+        Self {
+            values: c.as_ref().iter().map(|x| *x).collect(),
+            expected_msg: -1,
+            modulus,
+            log_ciphertext_modulus
+        }
     }
 }
 

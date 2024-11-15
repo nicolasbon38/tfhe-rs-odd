@@ -11,6 +11,11 @@ use std::fmt::{Debug, Formatter};
 
 use super::ciphertext::Encoding;
 
+use serde::{Serialize, Deserialize};
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufReader, BufWriter, Write};
+use rmp_serde::{encode, decode};
+
 /// A structure containing the client key, which must be kept secret.
 ///
 /// In more details, it contains:
@@ -132,4 +137,41 @@ impl ClientKey {
     pub fn new(parameter_set: &GadgetParameters) -> ClientKey {
         GadgetEngine::with_thread_local_mut(|engine| engine.create_client_key(*parameter_set))
     }
+}
+
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SerializableKey{
+    values: Vec<u64>
+}
+
+
+impl SerializableKey{
+
+    // Function to save to a file
+    pub fn append_to_file(&self, filename: &str) -> io::Result<()> {
+        let file = OpenOptions::new().append(true).create(true).open(filename)?;        
+        let mut writer = BufWriter::new(file);
+        encode::write(&mut writer, &self).unwrap();
+        writer.flush()?;
+        Ok(())
+    }
+
+    pub fn from_key(ck : &ClientKey) -> Self{
+        match ck.parameters.encryption_key_choice {
+            EncryptionKeyChoice::Big => {
+                SerializableKey{
+                    values: ck.clone().glwe_secret_key.as_lwe_secret_key().into_container().iter().map(|x| *x).collect()
+                }
+            }
+            EncryptionKeyChoice::Small => {
+                SerializableKey{
+                    values: ck.clone().lwe_secret_key.into_container()
+                }
+            }
+        }
+        
+
+    }
+
 }

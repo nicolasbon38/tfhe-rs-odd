@@ -22,7 +22,7 @@ use super::client_key;
 
 
 impl ServerKey {
-    ////Boolean only : gadget logic (see paper)//////
+    ////Boolean only : gadget logic (see paper BPR24)//////
     pub fn exec_gadget_with_extraction(&self, enc_in : &Vec<Encoding>, enc_inter : &Encoding, enc_out : &Encoding, input : &Vec<Ciphertext>) -> Ciphertext{
         GadgetEngine::with_thread_local_mut(|engine| engine.exec_gadget_with_extraction(enc_in, enc_inter, enc_out, input, &self))
     }
@@ -133,12 +133,10 @@ impl ServerKey {
             self)
         )
     }
-
-
 }
 
 
-///Research ofor even transistor
+///Research for even Transistor
 impl ServerKey{
     pub fn lwe_mult(&self, lhs:&Ciphertext, rhs: &Ciphertext, output_encoding : &Encoding, client_key_debug:&ClientKey) -> Ciphertext{
         GadgetEngine::with_thread_local_mut(|engine| engine.lwe_mult(&lhs, &rhs, output_encoding, &self, &client_key_debug))
