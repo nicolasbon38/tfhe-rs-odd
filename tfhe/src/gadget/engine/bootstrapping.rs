@@ -596,7 +596,7 @@ impl Bootstrapper {
             let mut accu_i = GlweCiphertext::new(0u64, v0.glwe_size(), v0.polynomial_size(), v0.ciphertext_modulus());
             accu_i.as_mut_polynomial_list().iter_mut().zip(v0.as_polynomial_list().iter()).for_each(|(mut output, v0_poly_j)| polynomial_karatsuba_wrapping_mul(&mut output, &v0_poly_j, &vi));
             
-            SerializableCiphertext::from_glwe_ciphertext(&accu_i, 64).append_to_file("data_generation/noise_measurements/serializations/mvb.msgpack").expect("Serialization of the ciphertext failed !");
+            //SerializableCiphertext::from_glwe_ciphertext(&accu_i, 64).append_to_file("data_generation/noise_measurements/serializations/mvb.msgpack").expect("Serialization of the ciphertext failed !");
             // Self::decrypt_glwe_with_builtin_function(&client_key_debug, &accu_i);
             // println!("------------------------------------------");
 

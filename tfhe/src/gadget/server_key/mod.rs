@@ -80,6 +80,8 @@ impl ServerKey {
             engine.compute_common_factor(&inputs[1], &encodings_out[0], &self)
         });
 
+        SerializableCiphertext::from_glwe_ciphertext(&common_factor, 64).append_to_file("data_generation/noise_measurements/serializations/tbb.msgpack").expect("Serialization of the ciphertext failed");
+
         let r0 = GadgetEngine::with_thread_local_mut(|engine| {
             engine.simple_tree_bootstrapping(&common_factor.clone(), inputs, &encodings_out[0], t, lut_f0, &self, client_key_debug, log)
         });

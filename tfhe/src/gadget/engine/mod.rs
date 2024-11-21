@@ -447,6 +447,8 @@ impl GadgetEngine {
                             );
                         }
 
+                        SerializableCiphertext::from_lwe_ciphertext(&lwe_c_0_after_ks, 64).append_to_file("data_generation/noise_measurements/serializations/tbb.msgpack").expect("Serialization of the ciphertext failed");
+
                         let first_ciphertexts = bootstrapper
                             .mvb_bootstrap_with_common_factor_given(
                                 &common_factor,
@@ -464,6 +466,8 @@ impl GadgetEngine {
                             );
                         }
 
+                        SerializableCiphertext::from_lwe_ciphertext(&first_ciphertexts[0], 64).append_to_file("data_generation/noise_measurements/serializations/tbb.msgpack").expect("Serialization of the ciphertext failed");
+
                         let next_accumulator = bootstrapper.pack_into_new_accumulator(
                             first_ciphertexts,
                             server_key,
@@ -475,6 +479,7 @@ impl GadgetEngine {
                                 SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
                             );
                         }
+                        SerializableCiphertext::from_glwe_ciphertext(&next_accumulator, 64).append_to_file("data_generation/noise_measurements/serializations/tbb.msgpack").expect("Serialization of the ciphertext failed");
 
                         // Self::decrypt_glwe_with_builtin_function(&client_key_debug, &next_accumulator);
                         // println!("--------------------------------------");
