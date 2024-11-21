@@ -3,6 +3,7 @@
 //! This module implements the generation of the client' secret keys, together with the
 //! encryption and decryption methods.
 
+use crate::core_crypto::prelude::ContiguousEntityContainer;
 use crate::gadget::prelude::*;
 use crate::gadget::engine::{GadgetEngine, WithThreadLocalEngine};
 use crate::gadget::parameters::GadgetParameters;
@@ -12,9 +13,9 @@ use std::fmt::{Debug, Formatter};
 use super::ciphertext::Encoding;
 
 use serde::{Serialize, Deserialize};
-use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, BufWriter, Write};
-use rmp_serde::{encode, decode};
+use std::fs::OpenOptions;
+use std::io::{self, BufWriter, Write};
+use rmp_serde::encode;
 
 /// A structure containing the client key, which must be kept secret.
 ///
@@ -142,13 +143,11 @@ impl ClientKey {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SerializableKey{
-    values: Vec<u64>
+    values: Vec<Vec<u64>>
 }
 
 
 impl SerializableKey{
-
-    // Function to save to a file
     pub fn append_to_file(&self, filename: &str) -> io::Result<()> {
         let file = OpenOptions::new().append(true).create(true).open(filename)?;        
         let mut writer = BufWriter::new(file);
@@ -157,21 +156,24 @@ impl SerializableKey{
         Ok(())
     }
 
-    pub fn from_key(ck : &ClientKey) -> Self{
-        match ck.parameters.encryption_key_choice {
+    pub fn from_key(ck : &ClientKey, encryption_key_choice: EncryptionKeyChoice) -> Self{
+        match encryption_key_choice {
             EncryptionKeyChoice::Big => {
                 SerializableKey{
-                    values: ck.clone().glwe_secret_key.as_lwe_secret_key().into_container().iter().map(|x| *x).collect()
+                    values: ck.clone().glwe_secret_key.as_lwe_secret_key().into_container().iter().map(|x| vec![*x]).collect()
                 }
             }
             EncryptionKeyChoice::Small => {
                 SerializableKey{
-                    values: ck.clone().lwe_secret_key.into_container()
+                    values: ck.clone().lwe_secret_key.into_container().iter().map(|x| vec![*x]).collect()
                 }
             }
         }
-        
+    }
 
+    pub fn glwe_big_key(ck: &ClientKey) -> Self{
+        let values = ck.clone().glwe_secret_key.as_polynomial_list().iter().map(|poly| poly.iter().map(|x| *x).collect::<Vec<u64>>()).collect();
+        Self {values}
     }
 
 }

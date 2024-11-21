@@ -80,6 +80,8 @@ rmp-serde = "1.3.0"
 
 [features]
 # paste is used by the HL API
+default = ["gadget"] #this line allows to use SerializableCiphertext in `core_crypto`
+
 boolean = ["dep:paste"]
 shortint = ["dep:paste"]
 gadget = ["dep:paste"]

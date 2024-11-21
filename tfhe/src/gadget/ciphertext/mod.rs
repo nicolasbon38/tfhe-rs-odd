@@ -3,13 +3,13 @@
 //! This module implements the ciphertext structure containing an encryption of a Boolean message.
 
 use crate::core_crypto::entities::*;
-use crate::core_crypto::prelude::{Container, UnsignedInteger};
+use crate::core_crypto::prelude::{Container, ContiguousEntityContainer};
 use std::collections::{HashMap, HashSet};
 
-use rmp_serde::{decode, encode};
+use rmp_serde::encode;
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, BufWriter, Write};
+use std::fs::OpenOptions;
+use std::io::{self, BufWriter, Write};
 
 #[derive(Clone, Debug)]
 pub enum Ciphertext {
@@ -272,7 +272,7 @@ impl Encoding {
 // Define your struct with Serialize and Deserialize traits
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SerializableCiphertext {
-    values: Vec<u64>, // The lwe coefficients
+    values: Vec<Vec<u64>>, // The glwe coefficients. In case of lwe, the inner vectors have only one element
     expected_msg: i64,
     modulus: u64,
     log_ciphertext_modulus: u64
@@ -294,7 +294,7 @@ impl SerializableCiphertext {
     pub fn from_ciphertext(c: &Ciphertext, expected_msg: i64) -> Self {
         match c {
             Ciphertext::EncodingEncrypted(lwe, encoding) => {
-                let values = lwe.clone().into_container();
+                let values = lwe.clone().into_container().iter().map(|x| vec![*x]).collect();
                 Self {
                     values,
                     expected_msg,
@@ -310,16 +310,25 @@ impl SerializableCiphertext {
 
     pub fn from_lwe_ciphertext<InputCont>(
         c: &LweCiphertext<InputCont>,
-        modulus: u64,
         log_ciphertext_modulus: u64
     ) -> Self
     where
         InputCont: Container<Element = u64>,
     {
         Self {
-            values: c.as_ref().iter().map(|x| *x).collect(),
+            values: c.as_ref().iter().map(|x| vec![*x]).collect(),
             expected_msg: -1,
-            modulus,
+            modulus: 0,
+            log_ciphertext_modulus
+        }
+    }
+
+    pub fn from_glwe_ciphertext(c: &GlweCiphertext<Vec<u64>>, log_ciphertext_modulus: u64) -> Self{
+        let values = c.as_polynomial_list().iter().map(|poly| poly.iter().map(|x| *x).collect::<Vec<u64>>()).collect::<Vec<Vec<u64>>>();
+        Self {
+            values,
+            expected_msg: -1,
+            modulus: 0,
             log_ciphertext_modulus
         }
     }
@@ -348,16 +357,16 @@ impl SerializableCiphertext {
 #[test]
 #[should_panic]
 fn bad_arithmetic_encoding_duplicate_i() {
-    let e = Encoding::new(3, [[0, 2].into(), [0].into(), [1].into()].into(), 5);
+    let _: Encoding = Encoding::new(3, [[0, 2].into(), [0].into(), [1].into()].into(), 5);
 }
 
 #[test]
 #[should_panic]
 fn bad_arithmetic_encoding_negacyclicity() {
-    let e = Encoding::new_canonical(3, vec![1, 5, 2], 8);
+    let _ = Encoding::new_canonical(3, vec![1, 5, 2], 8);
 }
 
 #[test]
 fn good_arithmetic_encoding_negacyclicity() {
-    let e = Encoding::new_canonical(3, vec![2, 1, 5], 8);
+    let _ = Encoding::new_canonical(3, vec![2, 1, 5], 8);
 }

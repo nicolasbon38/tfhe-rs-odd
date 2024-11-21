@@ -251,12 +251,15 @@ impl<'a> FourierLweBootstrapKeyView<'a> {
         let lut_poly_size = lut.polynomial_size();
         let ciphertext_modulus = lut.ciphertext_modulus();
         assert!(ciphertext_modulus.is_compatible_with_native_modulus());
-        let monomial_degree = MonomialDegree(fast_pbs_modulus_switch(
+        let b_modswitched = fast_pbs_modulus_switch(
             *lwe_body,
             lut_poly_size,
             ModulusSwitchOffset(0),
             LutCountLog(0),
-        ));
+        );
+        let monomial_degree = MonomialDegree(b_modswitched);
+
+        let mut lwe_modswitched_container = vec![];
 
         lut.as_mut_polynomial_list()
             .iter_mut()
@@ -279,13 +282,14 @@ impl<'a> FourierLweBootstrapKeyView<'a> {
         for (lwe_mask_element, bootstrap_key_ggsw) in izip!(lwe_mask.iter(), self.into_ggsw_iter())
         {
             if *lwe_mask_element != Scalar::ZERO {
-                let monomial_degree = MonomialDegree(fast_pbs_modulus_switch(
+                let a_modswitched = fast_pbs_modulus_switch(
                     *lwe_mask_element,
                     lut_poly_size,
                     ModulusSwitchOffset(0),
                     LutCountLog(0),
-                ));
-
+                );
+                let monomial_degree = MonomialDegree(a_modswitched);
+                lwe_modswitched_container.push(a_modswitched as u64);
                 // we effectively inline the body of cmux here, merging the initial subtraction
                 // operation with the monic polynomial multiplication, then performing the external
                 // product manually
@@ -313,6 +317,9 @@ impl<'a> FourierLweBootstrapKeyView<'a> {
                     stack.rb_mut(),
                 );
             }
+            else{
+                lwe_modswitched_container.push(0);
+            }
         }
 
         if !ciphertext_modulus.is_native_modulus() {
@@ -328,6 +335,9 @@ impl<'a> FourierLweBootstrapKeyView<'a> {
                 .iter_mut()
                 .for_each(|x| *x = signed_decomposer.closest_representable(*x));
         }
+
+        lwe_modswitched_container.push(b_modswitched as u64);
+        //let lwe_modswitched = LweCiphertextOwned::from_container(lwe_modswitched_container, CiphertextModulus::new_native());
     }
 
     pub fn bootstrap<Scalar>(

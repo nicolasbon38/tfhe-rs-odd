@@ -28,25 +28,7 @@ use crate::gadget::engine::bootstrapping::{Bootstrapper, ServerKey};
 use crate::core_crypto::seeders::new_seeder;
 
 use super::ciphertext::Encoding;
-use super::server_key;
 
-pub(crate) trait BinaryGatesEngine<L, R, K> {
-    fn and(&mut self, ct_left: L, ct_right: R, server_key: &K) -> Ciphertext;
-    fn nand(&mut self, ct_left: L, ct_right: R, server_key: &K) -> Ciphertext;
-    fn nor(&mut self, ct_left: L, ct_right: R, server_key: &K) -> Ciphertext;
-    fn or(&mut self, ct_left: L, ct_right: R, server_key: &K) -> Ciphertext;
-    fn xor(&mut self, ct_left: L, ct_right: R, server_key: &K) -> Ciphertext;
-    fn xnor(&mut self, ct_left: L, ct_right: R, server_key: &K) -> Ciphertext;
-}
-
-pub(crate) trait BinaryGatesAssignEngine<L, R, K> {
-    fn and_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
-    fn nand_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
-    fn nor_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
-    fn or_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
-    fn xor_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
-    fn xnor_assign(&mut self, ct_left: L, ct_right: R, server_key: &K);
-}
 
 /// Trait to be able to acces thread_local
 /// engines in a generic way
@@ -303,11 +285,11 @@ impl GadgetEngine {
         let bootstrapper = &mut self.bootstrapper;
 
         // compute the sum
-        input.iter().enumerate().for_each(|(i, x)| match x {
+        input.iter().for_each(|x| match x {
             Ciphertext::EncodingEncrypted(x_ct, _) => {
                 lwe_ciphertext_add_assign(&mut buffer_lwe_before_pbs, &x_ct);
             }
-            Ciphertext::Trivial(x) => panic!("Not yet implemented with trivial ciphertexts"),
+            Ciphertext::Trivial(_) => panic!("Not yet implemented with trivial ciphertexts"),
         });
 
         // compute the bootstrap and the key switch
