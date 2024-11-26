@@ -425,7 +425,7 @@ impl GadgetEngine {
     ) -> Ciphertext {
         let c_0 = inputs[1].clone();
         match c_0 {
-            Ciphertext::EncodingEncrypted(lwe_c_0, encoding_in_0) => {
+            Ciphertext::EncodingEncrypted(_, encoding_in_0) => {
                 let bootstrapper = &mut self.bootstrapper;
 
                 let o_0 = encoding_in_0.get_origin_modulus();
@@ -439,20 +439,11 @@ impl GadgetEngine {
                         panic!()
                     }
                     PBSOrder::KeyswitchBootstrap => {
-                        let lwe_c_0_after_ks = server_key.keyswitch(&lwe_c_0);
-                        if log {
-                            println!(
-                                "TIMING POST_FIRST_KEYSWITCH_TREE ? {:?}",
-                                SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                            );
-                        }
-
-                        SerializableCiphertext::from_lwe_ciphertext(&lwe_c_0_after_ks, 64).append_to_file("data_generation/noise_measurements/serializations/tbb.msgpack").expect("Serialization of the ciphertext failed");
+                        // No keyswitch here, because this part jas been taken part while bootstrapping the common factor
 
                         let first_ciphertexts = bootstrapper
                             .mvb_bootstrap_with_common_factor_given(
                                 &common_factor,
-                                lwe_c_0_after_ks,
                                 &encoding_in_0,
                                 &vec![encoding_out.clone(); (t / o_0).try_into().unwrap()],
                                 &first_functions,

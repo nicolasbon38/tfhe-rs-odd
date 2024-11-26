@@ -629,7 +629,6 @@ impl Bootstrapper {
     pub(crate) fn mvb_bootstrap_with_common_factor_given(
         &mut self,
         common_factor : &GlweCiphertext<Vec<u64>>,
-        ciphertext : LweCiphertextOwned<u64>,
         enc_in : &Encoding,
         encs_out : &Vec<Encoding>,
         lut_fis : &Vec<Vec<u64>>,
@@ -885,6 +884,7 @@ impl Bootstrapper {
         // let stop_keyswitch = start_keyswitch.elapsed();
         // println!("Durée Keyswitch: {:?}: {:?}", stop_keyswitch.as_millis(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap());
 
+        //SerializableCiphertext::from_lwe_ciphertext(&buffer_lwe_after_ks, 64).append_to_file("data_generation/noise_measurements/serializations/cjp.msgpack").expect("Serialization of the ciphertext failed");
 
 
         // let start_bootstrap = Instant::now();
