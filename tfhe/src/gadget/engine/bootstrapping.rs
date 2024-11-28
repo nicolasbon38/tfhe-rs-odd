@@ -532,6 +532,11 @@ impl Bootstrapper {
         let diff = (new_p as i32 - accumulator_data[0] as i32 - accumulator_data[p-1] as i32).rem_euclid(new_p as i32) as u64;
         accumulator[N_poly / (2 * p) + (p-1) * N_poly / p] = diff;
 
+        println!("Accumulator:");
+        accumulator.iter().for_each(|&x| print!("{}|", x));
+        println!();
+        let norm = accumulator.iter().map(|&x| x * x).sum::<u64>();
+        println!("Norm vi:{}", norm);
         accumulator
     } 
 
@@ -596,7 +601,7 @@ impl Bootstrapper {
             let mut accu_i = GlweCiphertext::new(0u64, v0.glwe_size(), v0.polynomial_size(), v0.ciphertext_modulus());
             accu_i.as_mut_polynomial_list().iter_mut().zip(v0.as_polynomial_list().iter()).for_each(|(mut output, v0_poly_j)| polynomial_karatsuba_wrapping_mul(&mut output, &v0_poly_j, &vi));
             
-            //SerializableCiphertext::from_glwe_ciphertext(&accu_i, 64).append_to_file("data_generation/noise_measurements/serializations/mvb.msgpack").expect("Serialization of the ciphertext failed !");
+            SerializableCiphertext::from_glwe_ciphertext(&accu_i, 64).append_to_file("mvb").expect("Serialization of the ciphertext failed !");
             // Self::decrypt_glwe_with_builtin_function(&client_key_debug, &accu_i);
             // println!("------------------------------------------");
 
@@ -762,31 +767,6 @@ impl Bootstrapper {
 
         }
 
-
-
-        // if p % 2 == 1{
-        //     (0..size_slice/2).for_each(|_| container_for_lwe_ciphertext_list.push(accumulator_elements[0].clone().into_container()));
-        //     for k in 1..p{
-        //         (0..size_slice).for_each(|_| container_for_lwe_ciphertext_list.push(accumulator_elements[k as usize].clone().into_container()))
-        //     }
-        //     let mut last_coeff = accumulator_elements[0].clone();
-        //     lwe_ciphertext_opposite_assign(&mut last_coeff);
-        //     (0..size_slice/2).for_each(|_| container_for_lwe_ciphertext_list.push(last_coeff.clone().into_container()));
-        // // }
-
-        // let input_lwe_ciphertexts = LweCiphertextList::from_container(
-        //     container_for_lwe_ciphertext_list.concat(), 
-        //     server_key.bootstrapping_key.output_lwe_dimension().to_lwe_size(), 
-        //     CiphertextModulus::new_native()
-        // );           
-
-
-        // keyswitch_lwe_ciphertext_list_and_pack_in_glwe_ciphertext(
-        //     &server_key.lwe_packing_keyswitch_key,
-        //     &input_lwe_ciphertexts, 
-        //     &mut output_glwe_ciphertext
-        // );
-
         output_glwe_ciphertext
 
 
@@ -884,7 +864,7 @@ impl Bootstrapper {
         // let stop_keyswitch = start_keyswitch.elapsed();
         // println!("Durée Keyswitch: {:?}: {:?}", stop_keyswitch.as_millis(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap());
 
-        //SerializableCiphertext::from_lwe_ciphertext(&buffer_lwe_after_ks, 64).append_to_file("data_generation/noise_measurements/serializations/cjp.msgpack").expect("Serialization of the ciphertext failed");
+        SerializableCiphertext::from_lwe_ciphertext(&buffer_lwe_after_ks, 64).append_to_file("cjp").expect("Serialization of the ciphertext failed");
 
 
         // let start_bootstrap = Instant::now();

@@ -339,7 +339,7 @@ impl<'a> FourierLweBootstrapKeyView<'a> {
 
         lwe_modswitched_container.push(b_modswitched as u64);
         let lwe_modswitched = LweCiphertextOwned::from_container(lwe_modswitched_container, CiphertextModulus::new_native());
-        //SerializableCiphertext::from_lwe_ciphertext(&lwe_modswitched, (1 + lut_poly_size.0.ilog2()).try_into().unwrap()).append_to_file("data_generation/noise_measurements/serializations/cjp.msgpack").expect("Serialization of the ciphertext failed");
+        SerializableCiphertext::from_lwe_ciphertext(&lwe_modswitched, (1 + lut_poly_size.0.ilog2()).try_into().unwrap()).append_to_file("cjp").expect("Serialization of the ciphertext failed");
 
     }
 

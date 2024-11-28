@@ -280,15 +280,24 @@ pub struct SerializableCiphertext {
 
 impl SerializableCiphertext {
     // Function to save to a file
-    pub fn append_to_file(&self, filename: &str) -> io::Result<()> {
-        let file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(filename)?;
-        let mut writer = BufWriter::new(file);
-        encode::write(&mut writer, &self).unwrap();
-        writer.flush()?;
-        Ok(())
+    pub fn append_to_file(&self, pattern_name : &str) -> io::Result<()> {
+        match std::env::var("PATTERN"){
+            Ok(pattern_activated) => {
+                if pattern_activated == pattern_name{
+                    let file = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(format!("data_generation/noise_measurements/serializations/{}.msgpack", pattern_name))?;
+                    let mut writer = BufWriter::new(file);
+                    encode::write(&mut writer, &self).unwrap();
+                    writer.flush()?;
+                }
+                Ok(())
+            }
+            Err(_) => {
+                panic!("The  variable environment PATTERN is not set !");
+            }
+        }
     }
 
     pub fn from_ciphertext(c: &Ciphertext, expected_msg: i64) -> Self {
